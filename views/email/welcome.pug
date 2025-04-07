@@ -1,0 +1,33 @@
+extends baseEmail
+
+block content
+  div.email-header
+    if userType === 'vendor'
+      div.thanks-message WELCOME TO HEZMART!
+      div.verify-message Your Vendor Account is Pending Approval
+    else
+      div.thanks-message THANKS FOR SIGNING UP!
+      div.verify-message Welcome to Hezmart
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+
+    if userType === 'vendor'
+      p.instruction
+        | Your vendor account has been successfully created on Hezmart. However, it is currently pending approval by our team.
+        br
+        | You will receive a notification once your account has been reviewed and approved.
+
+      p.validity-text
+        | Please ensure your store profile is complete and meets our vendor requirements.
+
+    else
+      p.instruction
+        | Thank you for registering with Hezmart. Your account has been successfully verified and is now active.
+        br
+        | Start shopping and enjoy the best deals!
+
+    p
+      | Best Regards,
+      br
+      strong Hezmart Team

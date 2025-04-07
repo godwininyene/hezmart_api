@@ -1,0 +1,22 @@
+extends baseEmail
+
+block content
+  div.email-header
+    div.thanks-message THANKS FOR SIGNING UP!
+    div.verify-message Verify your E-mail Address
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+    p.instruction Thank you for registering with Hezmart. To start using Hezmart, you will need to enter the following verification code to complete the registration process.
+
+    div.otp-container
+     
+        span.otp-digit #{emailVerificationCode}
+
+    p.validity-text
+      | For security reasons, this code will expire in 15 minutes. Please do not disclose this code to others.
+
+    p
+      | Best Regards,
+      br
+      strong Hezmart Team
