@@ -3,6 +3,38 @@ const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const Email = require('../utils/email');
 const { Op } = require('sequelize');
+const jwt = require('jsonwebtoken')
+
+const signToken = user =>{
+  return jwt.sign({id:user.id}, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRESIN
+  })
+}
+
+const createSendToken = (user, req, res, statusCode)=>{
+  const token = signToken(user);
+
+  const cookieOption = {
+    httpOnly:true,
+    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRESIN * 24 * 60 * 60 * 1000)
+
+  }
+  // Set 'secure' flag in production or if the request is secure
+  if (process.env.NODE_ENV === 'production' || req.secure) {
+    cookieOption.secure = true;
+  }
+  //Send the cookie
+  res.cookie('jwt', token, cookieOption);
+  //Remove Password from output
+  user.password = undefined;
+  res.status(statusCode).json({
+    status:"success",
+    token,
+    data:{
+        user
+    }
+  })
+}
 
 exports.signup = catchAsync(async(req, res, next) => {
   // Extract common fields for all users
@@ -94,6 +126,33 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     status: 'success',
     message: 'Email verified successfully!',
   });
+});
+
+exports.login = catchAsync(async(req, res, next)=>{
+  const{email, password} = req.body;
+
+  //1) Check if there is email and password
+  if(!email || !password){
+    return next(new AppError("Missing log in credentials", 
+    {credentials:"Please provide email and password "}, 401))
+  }
+
+  //2) Check if user exist and password is correct
+  const user = await User.scope('withPassword').findOne({
+    where: { email }
+  });
+
+  if( !user || !(await user.correctPassword(password, user.password))){
+    return next(new AppError("Password or email is incorrect", '', 401))
+  }
+
+  //3) Check if email is verified
+   if (!user.isEmailVerified) {
+    return next(new AppError("Please verify your email before logging in.",'', 400));
+  }
+
+  // 4) Everything is ok, send token to client
+  createSendToken(user, req, res, 200)
 });
 
 

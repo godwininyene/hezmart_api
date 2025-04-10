@@ -9,6 +9,7 @@ router.post(
     authController.signup
 );
 router.route('/verify_email').post(authController.verifyEmail);
+router.post('/login', authController.login)
 
 
 module.exports = router;

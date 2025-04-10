@@ -8,6 +8,10 @@ module.exports = (sequelize, DataTypes) => {
       // associations goes here
     }
 
+    async correctPassword(candidatePassword, userPassword){
+      return await bcrypt.compare(candidatePassword, userPassword)
+    }
+
     createEmailVerificationCode(){
       const code = crypto.randomInt(1000, 9999).toString();
       this.emailVerificationCode = code;
