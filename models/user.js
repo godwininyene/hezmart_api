@@ -20,12 +20,21 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   User.init({
-    name: {
+    // Common fields for user  and vendor
+    firstName: {
       type: DataTypes.STRING,
       allowNull: false,
       validate: {
-        notNull: { msg: 'Please provide your name' },
-        notEmpty: { msg: 'Name Cannot be empty' }
+        notNull: { msg: 'Please provide your firstname' },
+        notEmpty: { msg: 'firstname Cannot be empty' }
+      }
+    },
+    lastName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Please provide your lastname' },
+        notEmpty: { msg: 'lastname Cannot be empty' }
       }
     },
     email: {
@@ -36,6 +45,64 @@ module.exports = (sequelize, DataTypes) => {
         isEmail: { msg: 'Please provide a valid email address' }
       },
       unique:true
+    },
+    primaryPhone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        is: {
+          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
+          msg: 'Please provide a valid phone number'
+        },
+        notNull: { msg: 'Please provide primary phone number' },
+        notEmpty: { msg: 'Primary phone number cannot be empty' }
+      }
+    },
+    secondaryPhone: {
+      type: DataTypes.STRING,
+      allowNull:true,
+      validate: {
+        is: {
+          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
+          msg: 'Please provide a valid phone number'
+        }
+      }
+    },
+    primaryAddress: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Please provide primary address' },
+        notEmpty: { msg: 'Primary address cannot be empty' }
+      }
+    },
+    secondaryAddress: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    country: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Please provide your country' },
+        notEmpty: { msg: 'Country cannot be empty' }
+      }
+    },
+    city: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Please provide your city' },
+        notEmpty: { msg: 'City cannot be empty' }
+      }
+    },
+    region: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Please provide your region' },
+        notEmpty: { msg: 'Region cannot be empty' }
+      }
     },
     password: {
       type: DataTypes.STRING,
@@ -74,8 +141,6 @@ module.exports = (sequelize, DataTypes) => {
           args: [['admin', 'vendor', 'customer']],
           msg: 'Invalid user role'
         },
-        // notNull: { msg: 'Please provide your role' },
-        // notEmpty: { msg: 'Role Cannot be empty' },
         notAdminOnCreate() {
           if (this.isNewRecord && this.role === 'admin') {
             throw new Error('Cannot create admin users through signup');
@@ -94,30 +159,20 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    phone1: {
+    emailVerificationCode: {
       type: DataTypes.STRING,
+      allowNull: true
+    },
+    emailVerificationExpires: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    isEmailVerified: {
+      type: DataTypes.BOOLEAN,
       allowNull: true,
-      validate: {
-        is: {
-          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
-          msg: 'Please provide a valid phone number'
-        },
-        vendorRequired(value) {
-          if (this.role === 'vendor' && !value) {
-            throw new Error('Primary phone number is required for vendors');
-          }
-        }
-      }
+      defaultValue:false
     },
-    phone2: {
-      type: DataTypes.STRING,
-      validate: {
-        is: {
-          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
-          msg: 'Please provide a valid phone number'
-        }
-      }
-    },
+    // Fields specific to vendor
     ninNumber: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -133,17 +188,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    address: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      validate: {
-        vendorRequired(value) {
-          if (this.role === 'vendor' && !value) {
-            throw new Error('Please provide your address');
-          }
-        }
-      }
-    },
+   
     businessName: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -180,19 +225,6 @@ module.exports = (sequelize, DataTypes) => {
           }
         }
       }
-    },
-    emailVerificationCode: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    emailVerificationExpires: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    isEmailVerified: {
-      type: DataTypes.BOOLEAN,
-      allowNull: true,
-      defaultValue:false
     }
   }, {
     sequelize,

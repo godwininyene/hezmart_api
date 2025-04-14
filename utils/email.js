@@ -2,10 +2,10 @@ const nodemailer = require('nodemailer');
 const pug = require('pug')
 
 module.exports = class Email {
-    constructor(user, userType, emailVerificationCode){
+    constructor(user,  emailVerificationCode){
         this.email = user.email;
-        this.userType = userType;
-        this.firstName = user.name.split(" ")[0];
+        this.userType = user.role;
+        this.firstName = user.firstName;
         this.emailVerificationCode = emailVerificationCode;
         this.from = `Hezmart <${process.env.EMAIL_FROM}>`;
     }

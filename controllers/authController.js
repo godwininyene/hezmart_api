@@ -38,53 +38,76 @@ const createSendToken = (user, req, res, statusCode)=>{
 
 exports.signup = catchAsync(async(req, res, next) => {
   // Extract common fields for all users
-  const { name, email, password, passwordConfirm, role } = req.body;  
+  // const { name, email, password, passwordConfirm, role } = req.body;  
   // Base user data
-  const userData = {
-    name,
-    email,
-    password,
-    passwordConfirm,
-    role
-  };
+  // const userData = {
+  //   role,
+  //   firstName,
+  //   lastName,
+  //   email,
+  //   primaryPhone,
+  //   secondaryPhone,
+  //   primaryAddress,
+  //   secondaryAddress,
+  //   password,
+  //   passwordConfirm,
+  //   city,
+  // };
 
   // If user is a vendor, add vendor-specific fields
-  if (role === 'vendor') {
-    const { 
-      phone1, 
-      phone2, 
-      ninNumber, 
-      address, 
-      businessName, 
-      businessCategoryId, 
-      businessLogo 
-    } = req.body;
+  // if (role === 'vendor') {
+  //   const { 
+  //     phone1, 
+  //     phone2, 
+  //     ninNumber, 
+  //     address, 
+  //     businessName, 
+  //     businessCategoryId, 
+  //     businessLogo 
+  //   } = req.body;
 
-    Object.assign(userData, {
-      phone1,
-      phone2,
-      ninNumber,
-      address,
-      businessName,
-      businessCategoryId,
-      businessLogo,
-      status: 'pending'// Vendors start as pending
-    });
-  }
-  if(req.file) userData.businessLogo = req.file.filename
-  const user = await User.create(userData);
+  //   Object.assign(userData, {
+  //     phone1,
+  //     phone2,
+  //     ninNumber,
+  //     address,
+  //     businessName,
+  //     businessCategoryId,
+  //     businessLogo,
+  //     status: 'pending'// Vendors start as pending
+  //   });
+  // }
+  
+  const app_url =  process.env.APP_URL || 'http://127.0.0.1:6000'; 
+  if(req.file) req.body.businessLogo = `${app_url}/uploads/businesses/logos/${req.file.filename}`;
+  const user = await User.create(req.body);
 
   // Generate email verification token
   const verificationCode = user.createEmailVerificationCode();
   await user.save({ validateBeforeSave: false }); // <-- Save the user after setting the code
- 
-  // Send verification email
-  await new Email(user, role,  verificationCode).sendVerificationEmail();
+  //Remove password from output;
+  user.password=undefined;
+  user.passwordConfirm=undefined;
 
-  return res.status(201).json({ 
-    message: "User registered successfully. Please verify your email." ,
-    status:'success',
-  });
+  try {
+    // Send verification email
+    await new Email(user, verificationCode).sendVerificationEmail();
+    return res.status(201).json({ 
+      message: "User registered successfully. Please verify your email." ,
+      status:'success',
+      data:user
+    });
+  } catch (error) {
+    if (error.name === 'AppError') {
+      return next(error);
+    }
+    console.log('Transaction processing error:', error);
+    return next(new AppError(
+      "User registered successfully but there was a problem sendng email verification code.",
+      '',
+      500
+    ));
+  }
 });
 
 
