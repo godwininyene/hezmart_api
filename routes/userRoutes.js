@@ -10,6 +10,9 @@ router.post(
 );
 router.route('/verify_email').post(authController.verifyEmail);
 router.post('/login', authController.login)
+router.get('/logout', authController.logout)
+router.post('/forgotPassword', authController.forgotPassword)
+router.route('/resetPassword/:token').patch(authController.resetPassword);
 
 
 module.exports = router;

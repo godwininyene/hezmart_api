@@ -3,7 +3,8 @@ const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const Email = require('../utils/email');
 const { Op } = require('sequelize');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const signToken = user =>{
   return jwt.sign({id:user.id}, process.env.JWT_SECRET, {
@@ -37,46 +38,6 @@ const createSendToken = (user, req, res, statusCode)=>{
 }
 
 exports.signup = catchAsync(async(req, res, next) => {
-  // Extract common fields for all users
-  // const { name, email, password, passwordConfirm, role } = req.body;  
-  // Base user data
-  // const userData = {
-  //   role,
-  //   firstName,
-  //   lastName,
-  //   email,
-  //   primaryPhone,
-  //   secondaryPhone,
-  //   primaryAddress,
-  //   secondaryAddress,
-  //   password,
-  //   passwordConfirm,
-  //   city,
-  // };
-
-  // If user is a vendor, add vendor-specific fields
-  // if (role === 'vendor') {
-  //   const { 
-  //     phone1, 
-  //     phone2, 
-  //     ninNumber, 
-  //     address, 
-  //     businessName, 
-  //     businessCategoryId, 
-  //     businessLogo 
-  //   } = req.body;
-
-  //   Object.assign(userData, {
-  //     phone1,
-  //     phone2,
-  //     ninNumber,
-  //     address,
-  //     businessName,
-  //     businessCategoryId,
-  //     businessLogo,
-  //     status: 'pending'// Vendors start as pending
-  //   });
-  // }
   
   const app_url =  process.env.APP_URL || 'http://127.0.0.1:6000'; 
   if(req.file) req.body.businessLogo = `${app_url}/uploads/businesses/logos/${req.file.filename}`;
@@ -178,6 +139,16 @@ exports.login = catchAsync(async(req, res, next)=>{
   createSendToken(user, req, res, 200)
 });
 
+exports.logout = (req, res) => {
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+    secure:true,
+    sameSite: 'None',
+  });
+  res.status(200).json({ status: 'success' });
+};
+
 
 
 exports.restrictTo = (...roles)=>{
@@ -188,6 +159,73 @@ exports.restrictTo = (...roles)=>{
     next()
   }
 };
+
+
+exports.forgotPassword = catchAsync(async(req, res, next)=>{
+  const{email} = req.body;
+
+  //1) Check if there is email and password
+   if(!email){
+    return next(new AppError("Missing required field", 
+    {email:"Please provide your email address"}, 401))
+  }
+
+  
+  // 2) Get user based on POSTed email
+  const user = await User.findOne({ where: {email}})
+  if(!user){
+    return next(new AppError("No user was found with that email!", '', 404))
+  }
+
+  //3) Generate random reset token
+  const resetToken = user.createPasswordResetToken();
+  await user.save({validateBeforeSave:false});
+  const resetURL = `${req.get('referer')}/resetPassword?token=${resetToken}`
+ 
+  //4) Send token to client's email
+  try{
+    await new Email(user, '', resetURL).sendPasswordReset()
+    res.status(200).json({
+      status:"success",
+      message:"Token has been sent to email!"
+    });
+  }catch(err){
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({validateBeforeSave:false});
+    return next(new AppError("There was a problem sending email. Please try again later!",'', 500))
+  }
+});
+
+exports.resetPassword = catchAsync(async(req, res, next)=>{
+  // 1) Get user base on token
+  const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+  const user = await User.findOne({
+    where: {
+      passwordResetToken: hashedToken,
+      passwordResetExpires: {
+        [Op.gt]: new Date()
+      }
+    }
+  });
+
+
+  // 2) If token has not expire, and there is a user, set password
+  if(!user){
+      return next(new AppError("Invalid token or token has expired!", '', 404))
+  }
+
+  user.password = req.body.password;
+  user.passwordConfirm = req.body.passwordConfirm;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  await user.save();
+
+  // 3) Update passwordChangedAt property for the user
+
+  // 4) Log in the user, send JWT
+  createSendToken(user, req, res, 200)
+})
 
 
 // In your authController.js

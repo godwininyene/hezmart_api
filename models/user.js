@@ -18,6 +18,13 @@ module.exports = (sequelize, DataTypes) => {
       this.emailVerificationExpires =  new Date(Date.now() + 15 * 60 * 1000) // Code valid for 15 minutes
       return code;
     }
+
+    createPasswordResetToken = function(){
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      this.passwordResetExpires = Date.now() + 15 * 60 * 1000;// Code valid for 15 minutes
+      return resetToken;
+    }
   }
   User.init({
     // Common fields for user  and vendor
@@ -130,6 +137,10 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     passwordChangedAt: {
+      type: DataTypes.DATE
+    },
+    passwordResetToken:DataTypes.STRING,
+    passwordResetExpires: {
       type: DataTypes.DATE
     },
     role: {
