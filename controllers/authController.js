@@ -5,6 +5,7 @@ const Email = require('../utils/email');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const {promisify} = require('util')
 
 const signToken = user =>{
   return jwt.sign({id:user.id}, process.env.JWT_SECRET, {
@@ -139,6 +140,39 @@ exports.login = catchAsync(async(req, res, next)=>{
   createSendToken(user, req, res, 200)
 });
 
+
+exports.protect = catchAsync(async(req, res, next) =>{
+  // 1) Get token and check if it there
+  let token;
+  if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
+      token = req.headers.authorization.split(' ')[1]
+  }else if(req.cookies.jwt){
+      token = req.cookies.jwt;
+  }
+
+  if(!token){
+    return next(new AppError('You are not log in! Please log in to get access', '', 401))
+  }
+
+  // 2) validate token
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET)
+
+  // 3) Check if user still exist
+  // const currentUser = await User.findById(decoded.id)
+  const currentUser = await User.findByPk(decoded.id);
+  if(!currentUser){
+      return next(new AppError('The user belonging to this token does no longer exist.', '', 401))
+  }
+
+  // 4) Check if user change password after token was issued
+ if( currentUser.changedPasswordAfter(decoded.iat)){
+  return next(new AppError('User recently changed password. Please log in again.', '', 401))
+ }
+  //GRANT ACCESS TO  PROTECTED ROUTE
+  req.user = currentUser;
+  next();
+});
+
 exports.logout = (req, res) => {
   res.cookie('jwt', 'loggedout', {
     expires: new Date(Date.now() + 10 * 1000),
@@ -212,7 +246,7 @@ exports.resetPassword = catchAsync(async(req, res, next)=>{
 
   // 2) If token has not expire, and there is a user, set password
   if(!user){
-      return next(new AppError("Invalid token or token has expired!", '', 404))
+    return next(new AppError("Invalid token or token has expired!", '', 404))
   }
 
   user.password = req.body.password;
@@ -230,21 +264,21 @@ exports.resetPassword = catchAsync(async(req, res, next)=>{
 
 // In your authController.js
 exports.createAdmin = catchAsync(async (req, res, next) => {
-    // Only allow existing admins to create new admins
+  // Only allow existing admins to create new admins
     if (req.user.role !== 'admin') {
-      return next(new AppError('Only admins can create admin accounts', 403));
-    }
+    return next(new AppError('Only admins can create admin accounts', 403));
+  }
   
-    const admin = await User.create({
-      ...req.body,
-      role: 'admin',
-      status: 'active'
-    });
-  
-    res.status(201).json({
-      status: 'success',
-      data: {
-        user: admin
-      }
-    });
+  const admin = await User.create({
+    ...req.body,
+    role: 'admin',
+    status: 'active'
   });
+  
+  res.status(201).json({
+    status: 'success',
+    data: {
+      user: admin
+    }
+  });
+});

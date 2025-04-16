@@ -2,12 +2,13 @@ const nodemailer = require('nodemailer');
 const pug = require('pug')
 
 module.exports = class Email {
-    constructor(user,  emailVerificationCode, url){
+    constructor(user,  emailVerificationCode, url, type){
         this.email = user.email;
         this.userType = user.role;
         this.firstName = user.firstName;
         this.emailVerificationCode = emailVerificationCode;
-        this.url=url
+        this.url=url;
+        this.type = type;
         this.from = `Hezmart <${process.env.EMAIL_FROM}>`;
     }
 
@@ -42,6 +43,7 @@ module.exports = class Email {
             userType:this.userType,
             emailVerificationCode:this.emailVerificationCode,
             url: this.url,
+            type:this.type,
             subject
         })
         //2) Define email options
@@ -57,6 +59,9 @@ module.exports = class Email {
 
     async sendOnBoard(){
         await this.send("welcome", "Welcome to the family")
+    }
+    async sendStatus(){
+        await this.send('status', "Your Hezmart user account status");
     }
    
     async sendPasswordReset(){

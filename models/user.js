@@ -25,6 +25,15 @@ module.exports = (sequelize, DataTypes) => {
       this.passwordResetExpires = Date.now() + 15 * 60 * 1000;// Code valid for 15 minutes
       return resetToken;
     }
+
+    changedPasswordAfter(JWTtime){
+      //User has change password
+      if (this.passwordChangedAt) {
+        const changeTimeStamp = new Date(this.passwordChangedAt).getTime() / 1000;
+        return changeTimeStamp > JWTtime;
+      }
+      return false; // User has not changed password
+    }
   }
   User.init({
     // Common fields for user  and vendor
@@ -160,12 +169,12 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     status: {
-      type: DataTypes.ENUM('active', 'pending', 'blocked'),
+      type: DataTypes.ENUM('active', 'pending', 'denied', 'deactivated'),
       allowNull: false,
-      defaultValue: 'active',
+      defaultValue: this.role === 'admin' || this.role ==='customer' ? 'active' : 'pending',
       validate: {
         isIn: {
-          args: [['active', 'pending', 'blocked']],
+          args: [['active', 'pending', 'denied', 'deactivated']],
           msg: 'Invalid user status'
         }
       }

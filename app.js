@@ -5,10 +5,14 @@ const categoryRouter = require('./routes/categoryRoutes');
 const userRouter = require('./routes/userRoutes');
 const AppError = require('./utils/appError');
 const cookieParser = require('cookie-parser')
+const path = require('path')
 
 //Body parser, read data from req.body into body
 app.use(express.json());
 app.use(cookieParser())
+
+//Serve static files
+app.use(express.static(path.join(__dirname, 'public')))
 
 
 // 3) ROUTES

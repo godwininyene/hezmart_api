@@ -1,0 +1,59 @@
+extends baseEmail
+
+block content
+  div.email-header
+    if userType === 'vendor'
+      if type == 'account_approved'
+        div.thanks-message CONGRATULATIONS!
+        div.verify-message Your Vendor Account Has Been Approved
+      else if type == 'account_denied'
+        div.thanks-message SORRY!
+        div.verify-message Your Vendor Account Was Not Approved
+      else
+        div.thanks-message ACCOUNT DEACTIVATED
+        div.verify-message Your Vendor Account is Currently Inactive
+    else
+      div.thanks-message THANKS FOR SIGNING UP!
+      div.verify-message Welcome to Hezmart
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+
+    if userType === 'vendor'
+      if type == 'account_approved'
+        p.instruction
+          | We’re excited to let you know that your vendor account on Hezmart has been successfully reviewed and approved.
+          br
+          | You can now 
+          a(href=`${url}`, target='_blank') log in to your vendor dashboard
+          | , list your products, and start selling on our platform.
+
+        p.validity-text
+          | Welcome to the Hezmart vendor community. We look forward to your success!
+
+      else if type == 'account_denied'
+        p.instruction
+          | Thank you for your interest in selling on Hezmart.
+          br
+          | After carefully reviewing your application, we regret to inform you that your vendor account was not approved at this time.
+
+        p.validity-text
+          | If you believe this was in error or would like further clarification, please contact our Support Team. We're here to help.
+
+      else
+        p.instruction
+          | We’re writing to inform you that your vendor account has been deactivated.
+
+        p.validity-text
+          | If you believe this was a mistake or have any concerns, don’t hesitate to contact our Support Team for further assistance.
+
+    else
+      p.instruction
+        | Thank you for registering with Hezmart. Your account has been successfully verified and is now active.
+        br
+        | Start shopping and enjoy the best deals!
+
+    p
+      | Best Regards,
+      br
+      strong Hezmart Vendor Support Team

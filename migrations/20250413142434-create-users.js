@@ -64,7 +64,7 @@ module.exports = {
         defaultValue: 'customer'
       },
       status: {
-        type: Sequelize.ENUM('active', 'pending', 'blocked'),
+        type: Sequelize.ENUM('active', 'pending', 'denied', 'deactivated'),
         allowNull: false,
         defaultValue: 'active'
       },
