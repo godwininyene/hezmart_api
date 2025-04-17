@@ -48,11 +48,6 @@ exports.getCategory = catchAsync(async (req, res, next) => {
 
 // Delete category and its subcategories
 exports.deleteCategory = catchAsync(async (req, res, next) => {
-  // First delete subcategories
-  await Subcategory.destroy({
-    where: { categoryId: req.params.id }
-  });
-
   // Then delete the category
   const deletedCount = await Category.destroy({
     where: { id: req.params.id }
