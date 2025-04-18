@@ -1,5 +1,5 @@
 const catchAsync = require("../utils/catchAsync");
-const { Category, Subcategory } = require('../models');
+const { Category, SubCategory } = require('../models');
 const AppError = require('../utils/appError');
 
 // Create category
@@ -15,7 +15,12 @@ exports.createCategory = catchAsync(async (req, res, next) => {
 
 // Get all categories
 exports.getAllCategories = catchAsync(async (req, res, next) => {
-  const categories = await Category.findAll();
+  const categories = await Category.findAll({
+    include:{
+      model:SubCategory,
+      as:'subcategories'
+    }
+  });
   res.status(200).json({
     status: "success",
     result: categories.length,
@@ -29,7 +34,7 @@ exports.getAllCategories = catchAsync(async (req, res, next) => {
 exports.getCategory = catchAsync(async (req, res, next) => {
   const category = await Category.findByPk(req.params.id, {
     include: {
-      model: Subcategory,
+      model: SubCategory,
       as: 'subcategories' 
     }
   });

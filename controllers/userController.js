@@ -62,7 +62,6 @@ const updateApprovalStatus = async (user, newStatus) => {
 
 
 exports.updateStatus = catchAsync(async(req, res, next)=>{
-
     //Getting status and checking if it there
     let{status} = req.body
     if(!status){
