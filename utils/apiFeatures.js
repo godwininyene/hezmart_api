@@ -1,54 +1,112 @@
 const { Op, sequelize } = require('sequelize');
-// const sequelize = require('./../utils/sequelize')
+
+const{Tag, ProductOption, OptionValue} = require('./../models')
+
 class APIFeatures {
     constructor(queryString) {
         this.queryString = queryString;
-        this.queryOptions = {}; // Initialize query options
+        this.queryOptions = {
+            where: {},
+            include: []
+        };
     }
 
     filter() {
         const queryObj = { ...this.queryString };
-        const excludedFields = ['page', 'sort', 'limit', 'fields'];
-        excludedFields.forEach((el) => delete queryObj[el]); 
-        // Build `where` clause for advanced filtering
-        const where = {}; // Sequelize WHERE clause
+        const excludedFields = ['page', 'sort', 'limit', 'fields', 'tags', 'options'];
+        excludedFields.forEach((el) => delete queryObj[el]);
 
+        // Regular field filtering
         Object.keys(queryObj).forEach((key) => {
             const value = queryObj[key];
            
             if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
-              
-                // Handle operators like { viewCount: { gt: '2', lt: '10' } }
-                where[key] = {}; // Create a nested object for the field
+                this.queryOptions.where[key] = {};
                 Object.entries(value).forEach(([operator, val]) => {
-                    const sequelizeOperator = Op[operator]; // e.g., Op.gt, Op.lt
+                    const sequelizeOperator = Op[operator];
                     if (sequelizeOperator) {
-                        where[key][sequelizeOperator] = isNaN(val) ? val : Number(val);
+                        this.queryOptions.where[key][sequelizeOperator] = isNaN(val) ? val : Number(val);
                     }
                 });
             } else {
-                // Handle simple filtering (e.g., ?authorId=4)
-                where[key] = isNaN(value) ? value : Number(value);
+                this.queryOptions.where[key] = isNaN(value) ? value : Number(value);
             }
         });
 
-        this.queryOptions.where = where;
+        // Handle tag filtering
+        if (this.queryString.tags) {
+            const tags = Array.isArray(this.queryString.tags) 
+                ? this.queryString.tags 
+                : [this.queryString.tags];
+            
+            this.queryOptions.include.push({
+                model: Tag,
+                as:'tags',
+                attributes:['id','name'],
+                where: {
+                    name: {
+                        [Op.in]: tags
+                    }
+                },
+                through: { attributes: [] } // Exclude junction table attributes
+            });
+        }
+
+        // Handle option filtering
+        if (this.queryString.options) {
+            let optionsFilter;
+            try {
+                optionsFilter = typeof this.queryString.options === 'string'
+                    ? JSON.parse(this.queryString.options)
+                    : this.queryString.options;
+            } catch (e) {
+                console.error('Invalid options filter format');
+                return this;
+            }
+
+            optionsFilter.forEach(option => {
+                this.queryOptions.include.push({
+                    model: ProductOption,
+                    as: 'options',
+                    attributes:['id','name'],
+                    include: [{
+                        model: OptionValue,
+                        as: 'values',
+                        attributes:['id','value'],
+                        where: {
+                            value: Array.isArray(option.values) 
+                                ? { [Op.in]: option.values }
+                                : option.values
+                        }
+                    }],
+                    where: {
+                        name: option.name
+                    }
+                });
+            });
+        }
+
         return this;
     }
 
     sort() {
         if (this.queryString.sort) {
-            const sortBy = this.queryString.sort.split(',').join(' ');
-            this.queryOptions.order = sequelize.literal(sortBy);
+            const sortBy = this.queryString.sort.split(',');
+            this.queryOptions.order = sortBy.map(field => {
+                if (field.startsWith('-')) {
+                    return [field.slice(1), 'DESC'];
+                }
+                return [field, 'ASC'];
+            });
         } else {
-            this.queryOptions.order = [['createdAt', 'DESC']]; // Default sorting
+            this.queryOptions.order = [['createdAt', 'DESC']];
         }
         return this;
     }
 
     limitFields() {
         if (this.queryString.fields) {
-            const fields = this.queryString.fields.split(',').map(field => field.trim());
+            const fields = this.queryString.fields.split(',');
             this.queryOptions.attributes = fields;
         }
         return this;
@@ -63,6 +121,7 @@ class APIFeatures {
         this.queryOptions.offset = offset;
         return this;
     }
+
     getOptions() {
         return this.queryOptions;
     }

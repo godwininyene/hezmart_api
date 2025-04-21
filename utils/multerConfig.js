@@ -4,10 +4,16 @@ const AppError = require('./appError');
 
 // Set up storage for uploaded files
 const storage = multer.diskStorage({
+
     destination: (req, file, cb) => {
+      
         if (file.fieldname === 'businessLogo') {
             cb(null, 'public/uploads/businesses/logos');
-        } 
+        } else if(file.fieldname === 'coverImage'){
+            cb(null, 'public/uploads/products/coverImages');
+        }else if(file.fieldname === 'images'){
+            cb(null, 'public/uploads/products/images');
+        }
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -18,20 +24,19 @@ const storage = multer.diskStorage({
 
 // File filter with detailed error messages
 const fileFilter = (req, file, cb) => {
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    const allowedDocumentTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-    
-    if (file.fieldname === 'businessLogo') {
-        if (!allowedImageTypes.includes(file.mimetype)) {
-            return cb(new AppError(
-                'Invalid file type', 
-                { businessLogo: 'Logo must be an image (JPEG, PNG, GIF)' }, 
-                400
-            ), false);
-        }
-    } 
-    cb(null, true);
+    const fieldname = file.fieldname;
+    if(file.mimetype.startsWith('image')){
+        cb(null, true)
+    }else{
+        (new AppError(
+            'Invalid file type', 
+            { [fieldname]: `${fieldname} must be an image (JPEG, PNG, GIF)` }, 
+            400
+        ), false)
+    }
 };
+
+
 
 // Configure multer upload
 const upload = multer({
@@ -41,3 +46,7 @@ const upload = multer({
 
 // Middleware for handling business logo uploads
 exports.uploadBusinessLogo = upload.single('businessLogo')
+exports.uploadProductImages = upload.fields([
+    {name:'coverImage', maxCount: 1},
+    {name: 'images', maxCount: 3}
+])

@@ -6,6 +6,7 @@ module.exports = (sequelize, DataTypes) => {
   class SubCategory extends Model {
     static associate(models) {
       // define association here
+      SubCategory.hasMany(models.Product, {foreignKey: 'subCategoryId',as: 'products'});
       SubCategory.belongsTo(models.Category, { foreignKey: 'categoryId', as: 'category' })// One-to-Many (Category can have many subcategories;
     }
   }
@@ -34,6 +35,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'SubCategory',
+    tableName: 'subcategories' 
   });
   return SubCategory;
 };

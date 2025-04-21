@@ -20,6 +20,31 @@ const handleSequelizeDuplicateError = err =>{
     return new AppError('Invalid data supplied', errors, 400)
 }
 
+const handleMulterError = err =>{
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        // Determine which field exceeded size limit
+        const field = err.field === 'passportPhoto' ? 'passportPhoto' : 'identityDocument';
+        return new AppError(
+            'File too large',
+            { [field]: 'File size too large. Max 5MB allowed' },
+            400
+        );
+    }else if(err.code === 'LIMIT_UNEXPECTED_FILE'){
+        const field = err.field;
+        return new AppError(
+            'Unexpected field',
+            { [field]: `(${field}) is not a valid field.` },
+            400
+        );
+    }
+    // Handle other multer errors
+    return new AppError(
+        'File upload error',
+        { [err.field]: err.message },
+        400
+    );
+}
+
 
 const sendErrorProd = (err, req, res)=>{
     // A) API
@@ -35,7 +60,7 @@ const sendErrorProd = (err, req, res)=>{
         }
         // B) Programming or unknown error: Don't leak error details
         // 1) Log the error
-        console.error('ERROR', err)
+        console.error('ERROR HERE O', err)
         // 2) Send generic response
         return res.status(500).json({
             status:'error',
@@ -74,6 +99,7 @@ module.exports =(err, req, res, next)=>{
         //Handle sequelize Errors
         if(error.name === 'SequelizeValidationError')error = handleSequelizeValidationError(err)
         if(error.name === 'SequelizeUniqueConstraintError') error = handleSequelizeDuplicateError(err)
+        if(error.name === 'MulterError') error = handleMulterError(err)
 
         sendErrorProd(error,  req, res)
     }
