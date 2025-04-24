@@ -83,13 +83,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   } catch (error) {
     console.error('Product update failed:', error);
     return next(error)
-    // return next(new AppError(
-    //   error.message === 'Product not found' 
-    //     ? 'No product found with that ID' 
-    //     : 'Failed to update product',
-    //     '',
-    //   error.message === 'Product not found' ? 404 : 500
-    // ));
   }
 });
 

@@ -14,29 +14,39 @@ module.exports = (sequelize, DataTypes) => {
       // Associations
       Product.belongsTo(models.User, {
         foreignKey: 'userId',
-        as: 'user'
+        as: 'user',
+        onDelete: 'CASCADE', // If user is deleted, delete their products
+        onUpdate: 'CASCADE'
       });
-
+    
       Product.belongsTo(models.Category, {
         foreignKey: 'categoryId',
-        as: 'category'
+        as: 'category',
+        onDelete: 'RESTRICT', // Prevent deletion if products exist in this category
+        onUpdate: 'CASCADE'
       });
-
+    
       Product.belongsTo(models.SubCategory, {
         foreignKey: 'subCategoryId',
-        as: 'subCategory'
+        as: 'subCategory',
+        onDelete: 'RESTRICT', // Prevent deletion if products exist in this subcategory
+        onUpdate: 'CASCADE'
       });
-
+    
       Product.belongsToMany(models.Tag, {
         through: 'ProductTags',
         foreignKey: 'productId',
         otherKey: 'tagId',
-        as: 'tags'
+        as: 'tags',
+        onDelete: 'CASCADE', // If product is deleted, remove its tag associations
+        onUpdate: 'CASCADE'
       });
-
+    
       Product.hasMany(models.ProductOption, {
         foreignKey: 'productId',
-        as: 'options'
+        as: 'options',
+        onDelete: 'CASCADE', // If product is deleted, delete its options
+        onUpdate: 'CASCADE'
       });
     }
   }

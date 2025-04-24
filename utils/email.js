@@ -13,18 +13,26 @@ module.exports = class Email {
     }
 
     newTransport(){
-        // if(process.env.NODE_ENV === 'production'){
-        //     // Using hosted smtp service
-        //     return nodemailer.createTransport({
-        //         host: process.env.SMTP_EMAIL_HOST,
-        //         port: process.env.SMTP_EMAIL_PORT,
-        //         secure: process.env.SMTP_EMAIL_PORT == 465, // Use TLS for port 465
-        //         auth: {
-        //             user: process.env.SMTP_EMAIL_USER,
-        //             pass: process.env.SMTP_EMAIL_PASSWORD
-        //         }
-        //     });
-        // }
+        if(process.env.NODE_ENV === 'production'){
+            // Using Gmail service
+            return nodemailer.createTransport({
+                service:"Gmail",
+                auth:{
+                    user:process.env.GMAIL_USERNAME,
+                    pass:process.env.GMAIL_PASS
+                }
+            })
+            // Using hosted smtp service
+            // return nodemailer.createTransport({
+            //     host: process.env.SMTP_EMAIL_HOST,
+            //     port: process.env.SMTP_EMAIL_PORT,
+            //     secure: process.env.SMTP_EMAIL_PORT == 465, // Use TLS for port 465
+            //     auth: {
+            //         user: process.env.SMTP_EMAIL_USER,
+            //         pass: process.env.SMTP_EMAIL_PASSWORD
+            //     }
+            // });
+        }
 
         return nodemailer.createTransport({
             host:process.env.EMAIL_HOST,

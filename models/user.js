@@ -65,6 +65,7 @@ module.exports = (sequelize, DataTypes) => {
     primaryPhone: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique:true,
       validate: {
         is: {
           args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
@@ -77,6 +78,7 @@ module.exports = (sequelize, DataTypes) => {
     secondaryPhone: {
       type: DataTypes.STRING,
       allowNull:true,
+      unique:true,
       validate: {
         is: {
           args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
@@ -196,6 +198,7 @@ module.exports = (sequelize, DataTypes) => {
     ninNumber: {
       type: DataTypes.STRING,
       allowNull: true,
+      unique:true,
       validate: {
         len: {
           args: [11, 11],
@@ -265,6 +268,14 @@ module.exports = (sequelize, DataTypes) => {
             user.passwordChangedAt = Date.now() - 1000;
           }
         }
+      },
+      afterCreate: async (user, options) => {
+        const { Wallet } = sequelize.models;
+        await Wallet.create({
+          userId: user.id,
+          balance: 0.00,
+          currency: user.currency ? user.currency : 'NGN' // Default currency
+        });
       }
     },
     // Exclude password by default in queries

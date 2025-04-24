@@ -10,15 +10,18 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      // define association here
       ProductOption.belongsTo(models.Product, {
         foreignKey: 'productId',
-        as: 'product'
+        as: 'product',
+        onDelete: 'CASCADE', // Delete option when parent product is deleted
+        onUpdate: 'CASCADE'  // Update productId if parent product's id changes
       });
-
+    
       ProductOption.hasMany(models.OptionValue, {
         foreignKey: 'optionId',
-        as: 'values'
+        as: 'values',
+        onDelete: 'CASCADE', // Delete all values when option is deleted
+        onUpdate: 'CASCADE'  // Update optionId in values if option's id changes
       });
     }
   }

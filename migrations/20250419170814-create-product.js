@@ -1,4 +1,5 @@
 'use strict';
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('Products', {
@@ -11,50 +12,27 @@ module.exports = {
       name: {
         type: Sequelize.STRING,
         allowNull: false,
-        unique:true,
-        validate: {
-          notNull: true,
-          notEmpty: true
-        }
+        unique: true
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: false,
-        validate: {
-          notNull: true,
-          notEmpty: true
-        }
+        allowNull: false
       },
       price: {
         type: Sequelize.DECIMAL(10, 2),
-        allowNull: false,
-        validate: {
-          notNull: true,
-          min: 0
-        }
+        allowNull: false
       },
       discountPrice: {
         type: Sequelize.DECIMAL(10, 2),
-        validate: {
-          min: 0
-        }
+        comment: 'Must be less than price when set'
       },
       weight: {
-        type: Sequelize.DECIMAL(10, 2),
-        validate: {
-          min: 0
-        }
+        type: Sequelize.DECIMAL(10, 2)
       },
-
       ratingsAverage: {
         type: Sequelize.FLOAT,
-        defaultValue: 4.5,
-        validate: {
-          min: 1,
-          max: 5,
-        }
+        defaultValue: 4.5
       },
-
       ratingsQuantity: {
         type: Sequelize.INTEGER,
         defaultValue: 0
@@ -75,20 +53,15 @@ module.exports = {
       },
       coverImage: {
         type: Sequelize.STRING,
-        allowNull: false,
-        validate: {
-          notNull: true,
-          notEmpty: true
-        }
+        allowNull: false
       },
       images: {
         type: Sequelize.TEXT,
-        defaultValue: '[]',
-        allowNull: true
+        defaultValue: '[]'
       },
-      stockQuantity:{
+      stockQuantity: {
         type: Sequelize.INTEGER,
-        defaultValue:1
+        defaultValue: 1
       },
       shippingCountries: {
         type: Sequelize.TEXT,
@@ -100,15 +73,19 @@ module.exports = {
         references: {
           model: 'Categories',
           key: 'id'
-        }
+        },
+        onDelete: 'RESTRICT',
+        onUpdate: 'CASCADE'
       },
       subCategoryId: {
         type: Sequelize.INTEGER,
-        allowNull:false,
+        allowNull: false,
         references: {
           model: 'SubCategories',
           key: 'id'
-        }
+        },
+        onDelete: 'RESTRICT',
+        onUpdate: 'CASCADE'
       },
       userId: {
         type: Sequelize.INTEGER,
@@ -116,11 +93,13 @@ module.exports = {
         references: {
           model: 'Users',
           key: 'id'
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       status: {
         type: Sequelize.ENUM('pending', 'active', 'denied', 'suspended'),
-        defaultValue: 'active'
+        defaultValue: 'pending'
       },
       slug: {
         type: Sequelize.STRING,
@@ -172,7 +151,13 @@ module.exports = {
       }
     });
 
-    // Add composite unique index to prevent duplicate tag assignments
+    // Add indexes
+    await queryInterface.addIndex('Products', ['userId']);
+    await queryInterface.addIndex('Products', ['categoryId']);
+    await queryInterface.addIndex('Products', ['subCategoryId']);
+    await queryInterface.addIndex('Products', ['slug']);
+    
+    // Add composite unique index for ProductTags
     await queryInterface.addIndex('ProductTags', {
       fields: ['productId', 'tagId'],
       unique: true,
@@ -181,6 +166,12 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
+    await queryInterface.removeIndex('ProductTags', 'product_tag_unique');
+    await queryInterface.removeIndex('Products', ['slug']);
+    await queryInterface.removeIndex('Products', ['subCategoryId']);
+    await queryInterface.removeIndex('Products', ['categoryId']);
+    await queryInterface.removeIndex('Products', ['userId']);
+    
     await queryInterface.dropTable('ProductTags');
     await queryInterface.dropTable('Products');
   }

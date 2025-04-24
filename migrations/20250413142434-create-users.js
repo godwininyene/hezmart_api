@@ -25,10 +25,12 @@ module.exports = {
       primaryPhone: {
         type: Sequelize.STRING,
         allowNull: false,
+        unique:true,
       },
       secondaryPhone: {
         type: Sequelize.STRING,
         allowNull: true,
+        unique:true,
       },
       primaryAddress: {
         type: Sequelize.STRING,
@@ -58,6 +60,14 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: true,
       },
+      passwordResetToken:{
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      passwordResetExpires:{
+        type: Sequelize.DATE,
+        allowNull: true
+      },
       role: {
         type: Sequelize.ENUM('admin', 'vendor', 'customer'),
         allowNull: false,
@@ -83,7 +93,8 @@ module.exports = {
       },
       ninNumber: {
         type: Sequelize.STRING,
-        allowNull: true
+        allowNull: true,
+        unique:true,
       },
       businessName: {
         type: Sequelize.STRING,
