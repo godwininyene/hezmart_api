@@ -1,10 +1,11 @@
 const ProductService = require('../services/productService');
 const { parseField, handleFileUploads } = require('../utils/productHelpers');
 const APIFeatures = require("../utils/apiFeatures");
-const { Product, Tag, ProductOption, OptionValue, sequelize } = require("../models");
+const { Product, Tag, ProductOption, OptionValue, sequelize, User } = require("../models");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { getProductIncludes } = require('../utils/productHelpers');
+const Email = require('../utils/email');
 
 exports.createProduct = catchAsync(async (req, res, next) => {
   //Handle Files upload
@@ -103,3 +104,94 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
     return next(new AppError('Failed to delete product', '', 500));
   }
 });
+
+exports.updateStatus = catchAsync(async(req, res, next)=>{
+
+  const { action } = req.params; // approve, reject or suspend
+  // Retrieve product, and user
+  let product = await Product.findByPk(req.params.id, {
+    include:[
+      {
+        model:User,
+        as:'user',
+        attributes:['firstName', 'lastName', 'email']
+      }
+    ]
+  });
+
+  if (!product) {
+    return next(new AppError("No product was found with that ID", '', 404));
+  }
+
+  // Status checks
+  switch(action) {
+    case 'approve':
+      if (product.status === 'active') {
+        return next(new AppError("Product already approved!", '', 400));
+      }
+      product.status = 'active';
+      break;
+    case 'reject':
+      if (product.status === 'declined') {
+        return next(new AppError("Product already declined!", '', 400));
+      }
+      product.status = 'declined';
+      break;
+    case 'suspend':
+      if (product.status === 'suspended') {
+        return next(new AppError("Product already suspended!", '', 400));
+      }
+      product.status = 'suspended';
+      break;
+    default:
+      return next(new AppError("Invalid action provided", '', 400));
+  }
+  
+
+
+
+
+  // Prepare email info
+  const referer = req.get('referer') || `${req.protocol}://${req.get('host')}`;
+  const url = `${referer}/manage/vendor/dashboard`;
+  
+     
+  const types = {
+    approve: 'approved_product',
+    suspend:'suspended_product',
+    reject:'declined_product'
+  };
+  
+  // Set email info based on action and transaction type
+  const type = types[action];
+  
+  //save updates
+  await product.save({ validateBeforeSave: false });
+
+  const actionMessages = {
+    approve: 'approved',
+    reject: 'rejected',
+    suspend: 'suspended'
+  };
+  
+  const pastAction = actionMessages[action];
+  
+
+  try {
+    // Send email to vendor
+    await new Email(product.user, '', url, type).sendProductStatus()
+    res.status(200).json({
+      status: 'success',
+      message: `Product ${pastAction} successfully!`,
+      data: { product }
+    });
+  } catch (error) {
+   
+    console.log('Product processing error:', error);
+    return next(new AppError(
+      `Product ${pastAction} successfully but there was a problem sending email notification.`,
+      '',
+      500
+    ));
+  }
+})

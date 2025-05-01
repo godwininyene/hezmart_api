@@ -66,3 +66,4 @@ module.exports = (sequelize, DataTypes) => {
   });
   return CartItem;
 };
+

@@ -77,12 +77,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     secondaryPhone: {
       type: DataTypes.STRING,
-      allowNull:true,
-      unique:true,
+      allowNull: true,
+      unique: true,
       validate: {
-        is: {
-          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
-          msg: 'Please provide a valid phone number'
+        isValidPhone(value) {
+          if (value && !/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(value)) {
+            throw new Error('Please provide a valid phone number');
+          }
         }
       }
     },

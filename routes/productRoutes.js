@@ -10,7 +10,7 @@ router.route('/')
     .get(productController.getAllProducts)
     .post(
         authController.protect,
-        authController.restrictTo('admin'),
+        authController.restrictTo('vendor'),
         uploadProductImages,
         productController.createProduct
     )
@@ -23,11 +23,14 @@ router.route('/:id')
     )
     .patch(
         authController.protect,
-        authController.restrictTo('admin', 'vendor'),
+        authController.restrictTo('vendor'),
         uploadProductImages,
         productController.updateProduct
     )
 
-
+    router.route('/:id/action/:action').patch(
+        authController.protect,
+        authController.restrictTo('admin'),
+        productController.updateStatus)
 
 module.exports = router;

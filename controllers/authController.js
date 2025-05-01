@@ -63,7 +63,12 @@ exports.signup = catchAsync(async(req, res, next) => {
     if (error.name === 'AppError') {
       return next(error);
     }
-    console.log('Transaction processing error:', error);
+
+    if (error instanceof AppError) {
+      return next(error);
+    }
+    console.log('Record processing error:', error);
+
     return next(new AppError(
       "User registered successfully but there was a problem sendng email verification code.",
       '',

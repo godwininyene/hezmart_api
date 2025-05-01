@@ -1,0 +1,50 @@
+extends baseEmail
+
+block content
+  div.email-header
+    div.thanks-message
+      if type == 'approved_product'
+        | PRODUCT APPROVED!
+      else if type == 'suspended_product'
+        | PRODUCT SUSPENDED!
+      else if type == 'declined_product'
+        | PRODUCT DECLINED!
+
+    div.verify-message
+      if type == 'approved_product'
+        | Your product has been successfully approved and is now live.
+      else if type == 'suspended_product'
+        | Your product listing has been temporarily suspended.
+      else if type == 'declined_product'
+        | Unfortunately, your product listing has been declined.
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+
+    if type == 'approved_product'
+      p.instruction
+        | Congratulations! Your product listing has been reviewed and approved.
+        br
+        | You can view and manage it by 
+        a(href=`${url}`, target='_blank') logging into your vendor dashboard
+        | .
+
+    else if type == 'suspended_product'
+      p.instruction
+        | Please note that your product listing has been suspended due to policy reasons or quality concerns.
+        br
+        | Kindly review your listing and make necessary adjustments.
+
+    else if type == 'declined_product'
+      p.instruction
+        | After review, we regret to inform you that your product was not approved.
+        br
+        | You may wish to edit and resubmit it through your dashboard.
+
+    p.validity-text
+      | If you have any questions, please contact our Support Team.
+
+    p
+      | Best Regards,
+      br
+      strong Hezmart Vendor Support Team
