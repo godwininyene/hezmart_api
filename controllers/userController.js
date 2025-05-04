@@ -40,10 +40,10 @@ exports.getAllUsers = catchAsync(async(req, res, next)=>{
 
 
 const updateApprovalStatus = async (user, newStatus) => {
-    const validStatuses = ['approve', 'deny', 'deactivate'];
+    const validStatuses = ['approve', 'deny', 'deactivate', 'pending'];
     // Check if newStatus is valid
     if (!validStatuses.includes(newStatus)) {
-        throw new AppError("Invalid data", {status:`Status must be one of: ${validStatuses.join(', ')}`}, '', 400);
+        throw new AppError("Invalid data", {status:`Status must be one of: ${validStatuses.join(', ')}`}, 400);
     }
     // Prevent redundant status updates
     if (newStatus === 'approve' && user.status === 'active') {
@@ -54,6 +54,9 @@ const updateApprovalStatus = async (user, newStatus) => {
     }
     if (newStatus === 'deactivate' && user.status === 'deactivated') {
         throw new AppError("User account already deactivated!", '', 400);
+    }
+    if (newStatus === 'pending' && user.status === 'pending') {
+        throw new AppError("User account is pending already!", '', 400);
     }
 
     // Update the status
@@ -68,7 +71,11 @@ const updateApprovalStatus = async (user, newStatus) => {
     } else if (newStatus === 'deactivate') {
         console.log("Currently deactivating")
         user.status = 'deactivated';
+    }else if (newStatus === 'pending') {
+        console.log("Currently pending")
+        user.status = 'pending';
     }
+
 
     await user.save({ validateBeforeSave: false });
     return user;
@@ -96,13 +103,15 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
     if (status === 'deny') type='account_denied'
      
     if (status === 'deactivate') type="account_deactivated"
+    
+    if (status === 'pending') type="account_pending"
        
     try {
         const updatedUser = await updateApprovalStatus(user, status)
         await new Email(user, '', url, type).sendStatus();
         res.status(200).json({
             status: 'success',
-            essage: `User's account ${updatedUser.status} successfully!`,
+            message: `User's account mark as ${status} successfully!`,
             data:{
                 user:updatedUser
             }

@@ -9,6 +9,9 @@ block content
       else if type == 'account_denied'
         div.thanks-message SORRY!
         div.verify-message Your Vendor Account Was Not Approved
+      else if type == 'account_pending'
+        div.thanks-message THANK YOU!
+        div.verify-message Your Vendor Account is Under Review
       else
         div.thanks-message ACCOUNT DEACTIVATED
         div.verify-message Your Vendor Account is Currently Inactive
@@ -39,6 +42,15 @@ block content
 
         p.validity-text
           | If you believe this was in error or would like further clarification, please contact our Support Team. We're here to help.
+
+      else if type == 'account_pending'
+        p.instruction
+          | Thank you for applying to become a vendor on Hezmart.
+          br
+          | Your application has been received and is currently being reviewed by our team.
+
+        p.validity-text
+          | You’ll receive an update soon regarding the status of your account. We appreciate your patience.
 
       else
         p.instruction
