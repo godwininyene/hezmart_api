@@ -261,7 +261,7 @@ exports.forgotPassword = catchAsync(async(req, res, next)=>{
   //3) Generate random reset token
   const resetToken = user.createPasswordResetToken();
   await user.save({validateBeforeSave:false});
-  const resetURL = `${req.get('referer')}/resetPassword?token=${resetToken}`
+  const resetURL = `${req.get('referer')}resetPassword?token=${resetToken}`
  
   //4) Send token to client's email
   try{
