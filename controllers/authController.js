@@ -66,7 +66,7 @@ exports.signup = catchAsync(async(req, res, next) => {
 
     if (error instanceof AppError) {
       return next(error);
-    }
+  }
     console.log('Record processing error:', error);
 
     return next(new AppError(
@@ -82,19 +82,16 @@ exports.signup = catchAsync(async(req, res, next) => {
 exports.verifyEmail = catchAsync(async (req, res, next) => {
   const { code } = req.body;
   
-  
   // 1) Find the user with the verification code and check if it's still valid
   const user = await User.findOne({
     where: {
       emailVerificationCode: code,
       emailVerificationExpires: {
-        [Op.gt]: Date.now() // Sequelize equivalent of {$gt: Date.now()}
+        [Op.gt]: Date.now()
       }
     }
   });
  
-  
-
   // 2) If no user is found, return an error
   if (!user) {
     return next(new AppError("Invalid or expired verification code!", '', 400));
@@ -109,14 +106,59 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
   user.emailVerificationCode = null;
   user.emailVerificationExpires = null;
   await user.save({ validate: false });
-  // 5) Send verification email
-  await new Email(user, user.role, '').sendOnBoard();
-  // 6) Send response
-  res.status(200).json({
-    status: 'success',
-    message: 'Email verified successfully!',
-  });
+
+  try {
+    // Send welcome email
+    await new Email(user, user.role, '').sendOnBoard();
+    createSendToken(user, req, res, 200)
+  } catch (error) {
+    if (error.name === 'AppError') {
+      return next(error);
+    }
+    if (error instanceof AppError) {
+      return next(error);
+  }
+    console.log('Record processing error:', error);
+    return next(new AppError(
+      "Email verified successfully but there was a problem sendng email verification code.",
+      '',
+      500
+    ));
+  }
 });
+
+exports.resendVerificationEmail = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+  // 1. Check if email was provided
+  if (!email) {
+    return next(new AppError("Missing email address", { email: "Please provide your email address" }, 400));
+  }
+  // 2. Find user by email
+  const user = await User.findOne({ where: { email } });
+  if (!user) {
+    return next(new AppError("No user found with this email address", '', 404));
+  }
+  // 3. If already verified, don't send again
+  if (user.isEmailVerified) {
+    return next(new AppError("This email has already been verified", '', 400));
+  }
+  // 4. Generate a new verification code
+  const verificationCode = user.createEmailVerificationCode();
+  await user.save({ validateBeforeSave: false });
+  // 5. Send the email
+  try {
+    await new Email(user, verificationCode).sendVerificationEmail();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Verification email resent successfully'
+    });
+  } catch (error) {
+    console.error('Email sending error:', error);
+    return next(new AppError("Failed to send verification email. Please try again later.", '', 500));
+  }
+});
+
 
 exports.login = catchAsync(async(req, res, next)=>{
   const{email, password} = req.body;

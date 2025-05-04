@@ -21,6 +21,8 @@ const handleSequelizeDuplicateError = err =>{
 }
 
 const handleMulterError = err =>{
+    console.error('Multer error:', err);
+
     if (err.code === 'LIMIT_FILE_SIZE') {
         // Determine which field exceeded size limit
         const field = err.field === 'passportPhoto' ? 'passportPhoto' : 'identityDocument';
@@ -37,12 +39,15 @@ const handleMulterError = err =>{
             400
         );
     }
+  
+    
     // Handle other multer errors
     return new AppError(
         'File upload error',
-        { [err.field]: err.message },
+        { [err.field || 'file']: err.message || 'File upload failed' },
         400
     );
+    
 }
 
 

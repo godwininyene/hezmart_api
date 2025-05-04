@@ -10,6 +10,7 @@ router.post(
     authController.signup
 );
 router.route('/verify_email').post(authController.verifyEmail);
+router.route('/resend_verification').post(authController.resendVerificationEmail);
 router.post('/login', authController.login)
 router.get('/logout', authController.logout)
 router.post('/forgotPassword', authController.forgotPassword)

@@ -1,19 +1,22 @@
-const { Op, sequelize } = require('sequelize');
+const { Op } = require('sequelize');
 
-const{Tag, ProductOption, OptionValue} = require('./../models')
+const{Tag, ProductOption, OptionValue, sequelize} = require('./../models')
 
 class APIFeatures {
-    constructor(queryString) {
+    constructor(queryString, modelName) {
         this.queryString = queryString;
+        this.modelName = modelName; // Store the model name
         this.queryOptions = {
             where: {},
             include: []
         };
+
+        this.paginationInfo = {};
     }
 
     filter() {
         const queryObj = { ...this.queryString };
-        const excludedFields = ['page', 'sort', 'limit', 'fields', 'tags', 'options'];
+        const excludedFields = ['page', 'sort', 'limit', 'fields', 'tags', 'options', 'search'];
         excludedFields.forEach((el) => delete queryObj[el]);
 
         // Regular field filtering
@@ -32,6 +35,20 @@ class APIFeatures {
                 this.queryOptions.where[key] = isNaN(value) ? value : Number(value);
             }
         });
+
+        // Handle search with model-specific fields
+         if (this.queryString.search) {
+          
+            const searchTerm = this.queryString.search;
+            const searchConditions = this.getSearchConditions(searchTerm);
+            
+            if (searchConditions.length > 0) {
+                this.queryOptions.where = {
+                    ...this.queryOptions.where,
+                    [Op.or]: searchConditions
+                };
+            }
+        }
 
         // Handle tag filtering
         if (this.queryString.tags) {
@@ -89,6 +106,58 @@ class APIFeatures {
         return this;
     }
 
+    getSearchConditions(searchTerm) {
+        // Define searchable fields for each model
+        const modelSearchFields = {
+            User: [
+                { field: 'firstName', type: 'string' },
+                { field: 'lastName', type: 'string' },
+                { field: 'email', type: 'string' },
+                { field: 'businessName', type: 'string' },
+                { field: 'primaryPhone', type: 'phone' }
+            ],
+            Product: [
+                { field: 'name', type: 'string' },
+                { field: 'description', type: 'string' },
+                { field: 'sku', type: 'string' }
+            ],
+            Order: [
+                { field: 'orderNumber', type: 'string' },
+                { field: 'customerName', type: 'string' }
+            ]
+            // Add more models as needed
+        };
+
+        const searchConditions = [];
+        const fields = modelSearchFields[this.modelName] || [];
+
+        fields.forEach(({ field, type }) => {
+            if (type === 'string') {
+                searchConditions.push(
+                    sequelize.where(
+                        sequelize.fn('LOWER', sequelize.col(field)),
+                        { [Op.like]: `%${searchTerm.toLowerCase()}%` }
+                    )
+                );
+            } else if (type === 'phone') {
+                searchConditions.push({
+                    [field]: {
+                        [Op.like]: `%${searchTerm}%` // Phone numbers without case conversion
+                    }
+                });
+            } else if (type === 'number') {
+                if (!isNaN(searchTerm)) {
+                    searchConditions.push({
+                        [field]: Number(searchTerm)
+                    });
+                }
+            }
+            // Add more field types as needed
+        });
+
+        return searchConditions;
+    }
+
     sort() {
         if (this.queryString.sort) {
             const sortBy = this.queryString.sort.split(',');
@@ -119,11 +188,17 @@ class APIFeatures {
 
         this.queryOptions.limit = limit;
         this.queryOptions.offset = offset;
+
+        this.paginationInfo = { page, limit, offset };
         return this;
     }
 
     getOptions() {
         return this.queryOptions;
+    }
+
+    getPaginationInfo() {
+        return this.paginationInfo;
     }
 }
 

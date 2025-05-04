@@ -6,6 +6,7 @@ module.exports = (sequelize, DataTypes) => {
   class User extends Model {
     static associate(models) {
       // associations goes here
+      User.belongsTo(models.Category, {foreignKey: 'businessCategoryId', as:'category'})
     }
 
     async correctPassword(candidatePassword, userPassword){
@@ -13,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     createEmailVerificationCode(){
-      const code = crypto.randomInt(1000, 9999).toString();
+      const code = crypto.randomInt(1000, 9999).toString();//4 Digit Code
       this.emailVerificationCode = code;
       this.emailVerificationExpires =  new Date(Date.now() + 15 * 60 * 1000) // Code valid for 15 minutes
       return code;

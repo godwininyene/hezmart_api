@@ -6,7 +6,7 @@ const AppError = require('./appError');
 const storage = multer.diskStorage({
 
     destination: (req, file, cb) => {
-      
+       
         if (file.fieldname === 'businessLogo') {
             cb(null, 'public/uploads/businesses/logos');
         } else if(file.fieldname === 'coverImage'){
@@ -26,13 +26,16 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
     const fieldname = file.fieldname;
     if(file.mimetype.startsWith('image')){
-        cb(null, true)
+        cb(null, true);  
     }else{
-        (new AppError(
-            'Invalid file type', 
-            { [fieldname]: `${fieldname} must be an image (JPEG, PNG, GIF)` }, 
-            400
-        ), false)
+        cb(
+            new AppError(
+                'Invalid file type',
+                { [fieldname]: `${fieldname} must be an image (JPEG, PNG, GIF)` },
+                400
+            ),
+            false
+        );
     }
 };
 

@@ -1,23 +1,37 @@
-const { User } = require('../models');
+const { User, Category } = require('../models');
 const APIFeatures = require("../utils/apiFeatures");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require('../utils/appError');
 const Email = require('../utils/email');
+const generatePaginationMeta = require('../utils/pagination');
+
 
 exports.getAllUsers = catchAsync(async(req, res, next)=>{
     // Initialize APIFeatures with query params
-    const features = new APIFeatures(req.query)
+    const features = new APIFeatures(req.query, 'User')
     .filter()
     .sort()
     .limitFields()
     .paginate();
-    // Execute the query with the options
-    const users = await User.findAll(features.getOptions())
+
+    // Include category model
+    features.queryOptions.include = 
+        {
+          model: Category,
+          as:'category',
+          attributes:['name']
+        };
+    
+    // Execute the query with count
+    const { count, rows: users } = await User.findAndCountAll(features.getOptions());
+    const { page, limit } = features.getPaginationInfo();
+    const pagination = generatePaginationMeta({ count, page, limit, req });
     
     //Send Response
     res.status(200).json({
         status:"success",
         result:users.length,
+        pagination,
         data:{
             users
         }
