@@ -260,6 +260,9 @@ module.exports = (sequelize, DataTypes) => {
         if (user.role === 'vendor') {
           user.status = 'pending';
         }
+        if (user.secondaryPhone === '') {
+          user.secondaryPhone = null;
+        }
       },
       beforeSave: async (user) => {
         // 1. Hash password if it's new or changed
@@ -269,6 +272,9 @@ module.exports = (sequelize, DataTypes) => {
           if (!user.isNewRecord) {
             user.passwordChangedAt = Date.now() - 1000;
           }
+        }
+        if (user.secondaryPhone === '') {
+          user.secondaryPhone = null;
         }
       },
       afterCreate: async (user, options) => {
