@@ -124,6 +124,10 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Region cannot be empty' }
       }
     },
+    photo:{
+      type:DataTypes.STRING,
+      defaultValue:`${process.env.APP_URL}/uploads/users/default.jpg`
+    },
     password: {
       type: DataTypes.STRING,
       allowNull: false,

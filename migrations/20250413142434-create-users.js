@@ -52,6 +52,10 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      photo:{
+        type:Sequelize.STRING,
+        defaultValue:`${process.env.APP_URL}/uploads/users/default.jpg`
+      },
       password: {
         type: Sequelize.STRING,
         allowNull: false,
