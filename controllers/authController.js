@@ -120,7 +120,7 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
   }
     console.log('Record processing error:', error);
     return next(new AppError(
-      "Email verified successfully but there was a problem sendng email verification code.",
+      "Email verified successfully but there was a problem sendingg welcome email.",
       '',
       500
     ));
