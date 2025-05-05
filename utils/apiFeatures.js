@@ -107,7 +107,7 @@ class APIFeatures {
     }
 
     getSearchConditions(searchTerm) {
-        // Define searchable fields for each model
+        //Define searchable fields for each model
         const modelSearchFields = {
             User: [
                 { field: 'firstName', type: 'string' },
@@ -118,45 +118,45 @@ class APIFeatures {
             ],
             Product: [
                 { field: 'name', type: 'string' },
-                { field: 'description', type: 'string' },
-                { field: 'sku', type: 'string' }
+                { field: 'description', type: 'string' }
             ],
             Order: [
                 { field: 'orderNumber', type: 'string' },
                 { field: 'customerName', type: 'string' }
             ]
-            // Add more models as needed
         };
-
+    
         const searchConditions = [];
         const fields = modelSearchFields[this.modelName] || [];
-
+    
         fields.forEach(({ field, type }) => {
+            const qualifiedField = `${this.modelName}.${field}`; // Prefixed column name
+    
             if (type === 'string') {
                 searchConditions.push(
                     sequelize.where(
-                        sequelize.fn('LOWER', sequelize.col(field)),
+                        sequelize.fn('LOWER', sequelize.col(qualifiedField)),
                         { [Op.like]: `%${searchTerm.toLowerCase()}%` }
                     )
                 );
             } else if (type === 'phone') {
                 searchConditions.push({
-                    [field]: {
-                        [Op.like]: `%${searchTerm}%` // Phone numbers without case conversion
+                    [qualifiedField]: {
+                        [Op.like]: `%${searchTerm}%`
                     }
                 });
             } else if (type === 'number') {
                 if (!isNaN(searchTerm)) {
                     searchConditions.push({
-                        [field]: Number(searchTerm)
+                        [qualifiedField]: Number(searchTerm)
                     });
                 }
             }
-            // Add more field types as needed
         });
-
+    
         return searchConditions;
     }
+    
 
     sort() {
         if (this.queryString.sort) {

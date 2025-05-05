@@ -27,7 +27,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.getAllProducts = catchAsync(async(req, res, next) => {
-  const features = new APIFeatures(req.query)
+  const features = new APIFeatures(req.query, 'Product')
     .filter()
     .sort()
     .limitFields()
@@ -35,11 +35,18 @@ exports.getAllProducts = catchAsync(async(req, res, next) => {
 
     // Include category model
    features.queryOptions.include = 
-   {
-     model: Category,
-     as:'category',
-     attributes:['name', 'id']
-   };
+   [
+    {
+      model: Category,
+      as:'category',
+      attributes:['name', 'id']
+    },
+    {
+      model: User,
+      as:'user',
+      attributes:['businessName', 'id']
+    }
+   ];
 
     // Execute the query with count
     const { count, rows: products } = await Product.findAndCountAll(features.getOptions());
