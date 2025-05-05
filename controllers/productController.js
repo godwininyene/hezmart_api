@@ -1,11 +1,12 @@
 const ProductService = require('../services/productService');
 const { parseField, handleFileUploads } = require('../utils/productHelpers');
 const APIFeatures = require("../utils/apiFeatures");
-const { Product, Tag, ProductOption, OptionValue, sequelize, User } = require("../models");
+const { Product,  User, Category } = require("../models");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { getProductIncludes } = require('../utils/productHelpers');
 const Email = require('../utils/email');
+const generatePaginationMeta = require('../utils/pagination');
 
 exports.createProduct = catchAsync(async (req, res, next) => {
   //Handle Files upload
@@ -16,6 +17,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
   });
 
   //Create with association
+  req.body.userId =req.user.id
   const product = await ProductService.createWithAssociations(req.body);
   //Send Response
   res.status(201).json({
@@ -31,12 +33,27 @@ exports.getAllProducts = catchAsync(async(req, res, next) => {
     .limitFields()
     .paginate();
 
-  const products = await Product.findAll(features.getOptions());
+    // Include category model
+   features.queryOptions.include = 
+   {
+     model: Category,
+     as:'category',
+     attributes:['name', 'id']
+   };
+
+    // Execute the query with count
+    const { count, rows: products } = await Product.findAndCountAll(features.getOptions());
+    const { page, limit } = features.getPaginationInfo();
+    const pagination = generatePaginationMeta({ count, page, limit, req });
+
   
   res.status(200).json({
     status: "success",
     result: products.length,
-    data: { products }
+    pagination,
+    data:{
+      products
+    }
   });
 });
 

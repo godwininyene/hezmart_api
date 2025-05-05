@@ -1,6 +1,7 @@
 const catchAsync = require("../utils/catchAsync");
 const { Category, SubCategory } = require('../models');
 const AppError = require('../utils/appError');
+const APIFeatures = require("../utils/apiFeatures");
 
 // Create category
 exports.createCategory = catchAsync(async (req, res, next) => {
@@ -15,12 +16,18 @@ exports.createCategory = catchAsync(async (req, res, next) => {
 
 // Get all categories
 exports.getAllCategories = catchAsync(async (req, res, next) => {
-  const categories = await Category.findAll({
-    include:{
-      model:SubCategory,
-      as:'subcategories'
-    }
-  });
+  const features = new APIFeatures(req.query)
+  .limitFields()
+   // Include category model
+   features.queryOptions.include = 
+   {
+     model: SubCategory,
+     as:'subcategories',
+     attributes:['name', 'id']
+   };
+
+const categories = await Category.findAll(features.getOptions());
+
   res.status(200).json({
     status: "success",
     result: categories.length,
