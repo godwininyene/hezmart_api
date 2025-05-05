@@ -114,7 +114,7 @@ class APIFeatures {
                 { field: 'lastName', type: 'string' },
                 { field: 'email', type: 'string' },
                 { field: 'businessName', type: 'string' },
-                { field: 'primaryPhone', type: 'phone' }
+                { field: 'primaryPhone', type: 'string' }
             ],
             Product: [
                 { field: 'name', type: 'string' },
