@@ -28,7 +28,7 @@ router.route('/:id')
         productController.updateProduct
     )
 
-    router.route('/:id/action/:action').patch(
+    router.route('/:id/status').patch(
         authController.protect,
         authController.restrictTo('admin'),
         productController.updateStatus)

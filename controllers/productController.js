@@ -130,8 +130,8 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.updateStatus = catchAsync(async(req, res, next)=>{
+  let{status} = req.body// approve, reject or suspend
 
-  const { action } = req.params; // approve, reject or suspend
   // Retrieve product, and user
   let product = await Product.findByPk(req.params.id, {
     include:[
@@ -148,7 +148,7 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
   }
 
   // Status checks
-  switch(action) {
+  switch(status) {
     case 'approve':
       if (product.status === 'active') {
         return next(new AppError("Product already approved!", '', 400));
@@ -187,7 +187,7 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
   };
   
   // Set email info based on action and transaction type
-  const type = types[action];
+  const type = types[status];
   
   //save updates
   await product.save({ validateBeforeSave: false });
@@ -198,7 +198,7 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
     suspend: 'suspended'
   };
   
-  const pastAction = actionMessages[action];
+  const pastAction = actionMessages[status];
   
 
   try {
