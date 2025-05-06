@@ -36,7 +36,7 @@ exports.handleFileUploads = (req, existingImages = []) => {
 exports.getProductIncludes = () => [
   { association: 'category', attributes: ['id', 'name'] },
   { association: 'subCategory', attributes: ['id', 'name'] },
-  { association: 'user', attributes: ['id', 'firstName', 'lastName'] },
+  { association: 'user', attributes: ['id', 'firstName', 'lastName', 'businessName', 'businessLogo'] },
   { 
     association: 'tags',
     attributes: ['id', 'name'],
