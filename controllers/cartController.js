@@ -2,14 +2,15 @@ const { Cart, CartItem, Product } = require('../models');
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 
-exports.addToCart = catchAsync(async(req, res, next)=>{
+exports.addToCart = catchAsync(async (req, res, next) => {
     const userId = req.user?.id || null;
     const sessionId = req.sessionId;
-    const { productId, quantity = 1 } = req.body;
-    // Check if product exists
-    const product = await Product.findByPk(productId);
+    const { productId, quantity = 1, options = {} } = req.body;
 
-    if (!product) return next(new AppError('No product was found with that id', '', 404))
+    // Validate product
+    const product = await Product.findByPk(productId);
+    if (!product) return next(new AppError('No product was found with that id', '', 404));
+
     // Find or create cart
     const [cart] = await Cart.findOrCreate({
         where: userId ? { userId } : { sessionId },
@@ -20,24 +21,41 @@ exports.addToCart = catchAsync(async(req, res, next)=>{
         }
     });
 
-    // Check if item exists in cart
-     const [item, created] = await CartItem.findOrCreate({
-        where: { cartId: cart.id, productId },
-        defaults: { quantity }
-    });
-  
-    if (!created) {
-        item.quantity += parseInt(quantity);
-        await item.save();
-    }
+    // Stringify options to compare properly
+    const optionsString = JSON.stringify(options);
 
-    res.status(200).json({
-        status:"success",
-        data:{
-            item
+    // Check if item with same product and options exists
+    const existingItem = await CartItem.findOne({
+        where: {
+            cartId: cart.id,
+            productId,
+            selectedOptions: optionsString
         }
     });
+
+    if (existingItem) {
+        existingItem.quantity += parseInt(quantity);
+        await existingItem.save();
+        return res.status(200).json({
+            status: "success",
+            data: { item: existingItem }
+        });
+    }
+
+    // Else, create a new cart item
+    const item = await CartItem.create({
+        cartId: cart.id,
+        productId,
+        quantity,
+        selectedOptions: options
+    });
+
+    res.status(200).json({
+        status: "success",
+        data: { item }
+    });
 });
+
 
 exports.getCart = catchAsync(async (req, res, next) => {
     const userId = req.user?.id || null;
@@ -51,7 +69,7 @@ exports.getCart = catchAsync(async (req, res, next) => {
             include: [{
                 model: Product,
                 as: 'product', 
-                attributes: ['id', 'name', 'price', 'coverImage']
+                attributes: ['id', 'name', 'price', 'coverImage', 'discountPrice']
             }]
         }
     });
