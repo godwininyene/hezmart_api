@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 
-const{Tag, ProductOption, OptionValue, sequelize} = require('./../models')
+const{Tag, ProductOption, OptionValue, sequelize, Category} = require('./../models')
 
 class APIFeatures {
     constructor(queryString, modelName) {
@@ -123,6 +123,9 @@ class APIFeatures {
             Order: [
                 { field: 'orderNumber', type: 'string' },
                 { field: 'customerName', type: 'string' }
+            ],
+            Category: [
+                { field: 'name', type: 'string' }
             ]
         };
     

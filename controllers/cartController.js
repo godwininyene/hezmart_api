@@ -69,7 +69,7 @@ exports.getCart = catchAsync(async (req, res, next) => {
             include: [{
                 model: Product,
                 as: 'product', 
-                attributes: ['id', 'name', 'price', 'coverImage', 'discountPrice']
+                attributes: ['id', 'name', 'price', 'coverImage', 'discountPrice', 'stockQuantity']
             }]
         }
     });
@@ -79,25 +79,77 @@ exports.getCart = catchAsync(async (req, res, next) => {
             status: "success",
             data: {
                 items: [],
-                summary: { totalItems: 0, totalCost: 0 }
+                summary: { 
+                    totalItems: 0, 
+                    subtotal: 0,
+                    discount: 0,
+                    deliveryFee: 0,
+                    tax: 0,
+                    total: 0
+                }
             }
         });
     }
 
     const items = cart.items || [];
 
+    // Calculate all financial values
     const summary = items.reduce((acc, item) => {
+        const itemPrice = parseFloat(item.product.price);
+        const itemDiscountPrice = item.product.discountPrice ? parseFloat(item.product.discountPrice) : null;
+        
         acc.totalItems += item.quantity;
-        acc.totalCost += item.quantity * item.product.price;
+        acc.subtotal += item.quantity * itemPrice;
+        
+        if (itemDiscountPrice) {
+            acc.discount += item.quantity * (itemPrice - itemDiscountPrice);
+        }
+        
         return acc;
-    }, { totalItems: 0, totalCost: 0 });
+    }, { 
+        totalItems: 0, 
+        subtotal: 0,
+        discount: 0,
+        deliveryFee: 1500, // Default delivery fee
+        tax: 0 // Can be calculated based on location
+    });
+
+    // Calculate final totals
+    summary.total = summary.subtotal - summary.discount + summary.deliveryFee + summary.tax;
+
+    // Add product availability information
+    const itemsWithAvailability = items.map(item => ({
+        ...item.get({ plain: true }),
+        available: item.product.stockQuantity >= item.quantity
+    }));
 
     res.status(200).json({
         status: "success",
-        result:cart.items.length,
+        result: items.length,
         data: {
-            items: cart.items,
-            summary
+            items: itemsWithAvailability,
+            summary,
+            // Include available shipping options
+            shippingOptions: [
+                { 
+                    id: 'standard', 
+                    name: 'Standard Delivery', 
+                    cost: 1500, 
+                    estimatedDays: '3-5 business days' 
+                },
+                { 
+                    id: 'express', 
+                    name: 'Express Delivery', 
+                    cost: 3000, 
+                    estimatedDays: '1-2 business days' 
+                },
+                { 
+                    id: 'pickup', 
+                    name: 'Store Pickup', 
+                    cost: 0, 
+                    estimatedDays: 'Ready in 1 hour' 
+                }
+            ]
         }
     });
 });

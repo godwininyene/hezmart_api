@@ -79,6 +79,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     discountPrice: {
       type: DataTypes.DECIMAL(10, 2),
+      allowNull:true,
       validate: {
         min: { args: [0], msg: 'Discount price cannot be negative' },
         isLessThanPrice(value) {

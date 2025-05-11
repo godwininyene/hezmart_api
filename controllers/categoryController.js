@@ -5,11 +5,53 @@ const APIFeatures = require("../utils/apiFeatures");
 
 // Create category
 exports.createCategory = catchAsync(async (req, res, next) => {
+  
+  const host = `${req.protocol}://${req.get('host')}`;
+
+  if (req.file) {
+    req.body.icon = `${host}/uploads/categoryIcons/${req.file.filename}`;
+  }
   const category = await Category.create(req.body);
+
   res.status(200).json({
     status: "success",
     data: {
       category
+    }
+  });
+});
+
+// Update category
+exports.updateCategory = catchAsync(async (req, res, next) => {
+  const host = `${req.protocol}://${req.get('host')}`;
+
+  // Update icon path if file was uploaded
+  if (req.file) {
+    req.body.icon = `${host}/uploads/categoryIcons/${req.file.filename}`;
+  }
+
+  // Update the category
+  const [affectedRows] = await Category.update(req.body, {
+    where: { id: req.params.id }
+  });
+
+  // Check if any rows were affected
+  if (affectedRows === 0) {
+    return next(new AppError('No category was found with that ID','', 404));
+  }
+
+  // Fetch the updated category
+  const updatedCategory = await Category.findByPk(req.params.id, {
+    include: {
+      model: SubCategory,
+      as: 'subcategories'
+    }
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      category: updatedCategory
     }
   });
 });

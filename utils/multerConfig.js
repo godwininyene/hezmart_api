@@ -13,6 +13,8 @@ const storage = multer.diskStorage({
             cb(null, 'public/uploads/products/coverImages');
         }else if(file.fieldname === 'images'){
             cb(null, 'public/uploads/products/images');
+        }else if(file.fieldname === 'catIcon'){
+            cb(null, 'public/uploads/categoryIcons')
         }
     },
     filename: (req, file, cb) => {
@@ -52,4 +54,6 @@ exports.uploadBusinessLogo = upload.single('businessLogo')
 exports.uploadProductImages = upload.fields([
     {name:'coverImage', maxCount: 1},
     {name: 'images', maxCount: 3}
-])
+]);
+
+exports.uploadCategoryIcon = upload.single('catIcon');
