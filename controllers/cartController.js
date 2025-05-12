@@ -268,11 +268,13 @@ exports.clearCart = catchAsync(async (req, res, next) => {
     if (!cart || !cart.items || cart.items.length === 0) {
       return res.status(200).json({ status: "success", message: "Cart is already empty" });
     }
+
+    await CartItem.destroy({ where: { cartId: cart.id } });
   
     // Remove all items from the cart
-    for (const item of cart.items) {
-      await item.destroy();
-    }
+    // for (const item of cart.items) {
+    //   await item.destroy();
+    // }
   
     res.status(200).json({
       status: "success",
