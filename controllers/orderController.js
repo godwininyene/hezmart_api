@@ -1,5 +1,6 @@
 const catchAsync = require("../utils/catchAsync");
 const { Cart, CartItem, Product, Order, OrderItem } = require('../models');
+const AppError = require("../utils/appError");
 
 exports.getCheckoutSession = catchAsync(async (req, res, next) => {
     // 1) Get cart from database
