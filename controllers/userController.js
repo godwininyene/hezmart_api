@@ -123,3 +123,66 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
         return next(new AppError("User's status updated successfull but there was a problem sending the email.", '', 500));
     }
 })
+
+
+
+const filterObj = (obj, ...allowedFields) => {
+    const newObj = {};
+    Object.keys(obj).forEach(el => {
+        if (allowedFields.includes(el)) newObj[el] = obj[el];
+    });
+    return newObj;
+};
+
+exports.updateMe = catchAsync(async (req, res, next) => {
+    // 1) Create error if user POSTs password data
+    if (req.body.password || req.body.passwordConfirm) {
+        return next(new AppError('This route is not for password updates. Please use /updateMyPassword route!', '', 400));
+    }
+
+    // 2) Filter out unwanted fields and only allow specific updates
+    const allowedFields = [
+        'firstName', 
+        'lastName', 
+        'email', 
+        'primaryPhone', 
+        'secondaryPhone', 
+        'city', 
+        'primaryAddress', 
+        'secondaryAddress',
+        'photo'
+    ];
+    
+    const filteredBody = filterObj(req.body, ...allowedFields);
+    
+    // Handle file upload if present
+    if (req.file) filteredBody.photo = req.file.filename;
+
+    // 3) Update user document using Sequelize
+    
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+        return next(new AppError('User not found', '', 404));
+    }
+
+    // Update the user with the filtered data
+    await user.update(filteredBody, {
+        fields: allowedFields, // Only update allowed fields
+        validate: true // Run model validations
+    });
+
+    // Optionally: If you want to return the updated user without sensitive data
+    const userData = user.get({ plain: true });
+    delete userData.password;
+    delete userData.passwordResetToken;
+    delete userData.passwordResetExpires;
+    delete userData.emailVerificationCode;
+    delete userData.emailVerificationExpires;
+
+    res.status(200).json({
+        status: 'success',
+        data: {
+            user: userData
+        }
+    });
+});

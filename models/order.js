@@ -154,7 +154,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     deliveryAddress: {
-      type: DataTypes.JSON,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: { msg: 'Delivery address is required' },
