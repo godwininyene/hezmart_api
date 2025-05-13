@@ -29,8 +29,8 @@ class ProductService {
       const updatableFields = [
         'name', 'description', 'price', 'discountPrice', 
         'weight', 'isDigital', 'seoTitle', 'seoDescription',
-        'taxable', 'coverImage',  'stockQuantity',
-        'images', 'shippingCountries'
+        'taxable', 'coverImage',  'stockQuantity', 
+        'images', 'shippingCountries', 'categoryId', 'subCategoryId'
       ];
   
       updatableFields.forEach(field => {
