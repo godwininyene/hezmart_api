@@ -119,10 +119,6 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const { deliveryAddress, paymentMethod='card', shippingOptionId } = req.body;
 
-  console.log('Delivery Address', deliveryAddress)
-  console.log('paymentMethod', paymentMethod)
-  console.log('shippingOptionId', shippingOptionId)
-
    // Retrieve cart with items and products
   const cart = await Cart.findOne({
     where: { userId },
@@ -197,6 +193,7 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
     email: req.user.email,
     amount: total * 100, // Paystack uses kobo (multiply by 100)
     reference: orderNumber,
+
     callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
     metadata: {
       custom_fields: [
@@ -225,26 +222,27 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       payload,
       {
         headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
           'Content-Type': 'application/json'
         }
       }
     );
-
-    console.log('Response', response);
-    
+     // Clear the cart
+    if(response.data.status){
+      await Cart.destroy({ where: { userId: order.userId } });
+    }
 
     res.status(200).json({
       status: "success",
       data: {
         checkoutUrl: response.data.data.authorization_url,
-        // orderId: order.id,
+        orderId: order.id,
         reference: orderNumber
       }
     });
   } catch (error) {
     // If Paystack fails, mark order as failed
-    // await order.update({ status: 'failed' });
+    await order.update({ status: 'failed' });
     throw error;
   }
 });
@@ -276,9 +274,6 @@ exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
       status: 'processing'
     });
 
-    // Clear the cart
-    await CartItem.destroy({ where: { cartId: order.userId } });
-
     // Update product stock quantities
     const orderItems = await OrderItem.findAll({ where: { orderId: order.id } });
     await Promise.all(orderItems.map(async item => {
@@ -288,6 +283,8 @@ exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
         await product.save();
       }
     }));
+    // Clear the cart
+    await Cart.destroy({ where: { userId: order.userId } });
   }
 
   res.status(200).json({ status: 'success' });
@@ -301,7 +298,9 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
     `https://api.paystack.co/transaction/verify/${reference}`,
     {
       headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+        
+        // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+         Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`
       }
     }
   );
@@ -311,7 +310,7 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
   // Find and update order
   const order = await Order.findOne({ where: { orderNumber: reference } });
   if (!order) {
-    return next(new AppError('Order not found', 404));
+    return next(new AppError('Order not found','', 404));
   }
 
   if (paymentData.status === 'success') {
@@ -321,12 +320,27 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
     });
 
     // Clear cart
-    await CartItem.destroy({ where: { cartId: order.userId } });
+    await Cart.destroy({ where: { userId: order.userId } });
   }
+  //Get user's orders 
+  const orders = await Order.findAll({
+    where: { userId: req.user.id },
+    include: [{
+      model: OrderItem,
+      as: 'items',
+      include: [{
+        model: Product,
+        as: 'product',
+        attributes: ['id', 'name', 'coverImage']
+      }]
+    }],
+    order: [['createdAt', 'DESC']]
+  });
 
   res.status(200).json({
     status: 'success',
     data: {
+      orders,
       paymentStatus: paymentData.status,
       orderStatus: order.status
     }
