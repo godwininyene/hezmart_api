@@ -59,6 +59,10 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         notNull: { msg: 'User ID is required' },
         isInt: { msg: 'User ID must be an integer' }
+      },
+      references: {
+        model: 'Users',
+        key: 'id'
       }
     },
     orderNumber: {
@@ -156,24 +160,41 @@ module.exports = (sequelize, DataTypes) => {
     deliveryAddress: {
       type: DataTypes.TEXT,
       allowNull: false,
+      get() {
+        const rawValue = this.getDataValue('deliveryAddress');
+        try {
+          return JSON.parse(rawValue);
+        } catch (e) {
+          return null;
+        }
+      },
+      set(value) {
+        if (typeof value === 'object' && value !== null) {
+          this.setDataValue('deliveryAddress', JSON.stringify(value));
+        } else {
+          throw new Error('Delivery address must be an object');
+        }
+      },
       validate: {
         notNull: { msg: 'Delivery address is required' },
         isValidAddress(value) {
-          if (!value || !value.street || !value.city || !value.country) {
-            throw new Error('Delivery address must include street, city, and country');
+        
+          
+          let addressObj;
+          try {
+            addressObj = typeof value === 'string' ? JSON.parse(value) : value;
+          } catch (err) {
+            throw new Error('Delivery address must be a valid JSON object');
           }
-        }
-      }
-    },
-    contactPhone: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notNull: { msg: 'Contact phone is required' },
-        notEmpty: { msg: 'Contact phone cannot be empty' },
-        is: {
-          args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
-          msg: 'Please provide a valid phone number'
+          if (
+            !addressObj.primaryAddress ||
+            !addressObj.city ||
+            !addressObj.country ||
+            !addressObj.primaryPhone ||
+            !addressObj.firstName
+          ) {
+            throw new Error('Delivery address must include primary address, name, city, primary phone, and country');
+          }
         }
       }
     },

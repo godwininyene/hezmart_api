@@ -38,6 +38,17 @@ exports.getAllUsers = catchAsync(async(req, res, next)=>{
     })
 });
 
+exports.getUser = catchAsync(async(req, res, next)=>{
+    const user = await User.findByPk(req.params.id)
+    if(!user){
+        return next(new AppError('No user was found with that ID', '', 404));
+    }
+    res.status(200).json({
+        status:"success",
+        user
+    });
+})
+
 
 const updateApprovalStatus = async (user, newStatus) => {
     const validStatuses = ['approve', 'deny', 'deactivate', 'pending'];

@@ -5,9 +5,12 @@ const orderController = require('./../controllers/orderController');
 
 const router = express.Router();
 
-router.post('/checkout-session', authController.protect, orderController.getCheckoutSession)
+router.get('/', authController.protect, orderController.getUserOrders);
+router.get('/orders/:id', authController.protect, orderController.getOrder);
+router.patch('/orders/:id/cancel', authController.protect, orderController.cancelOrder);
+router.post('/checkout-session', authController.protect, orderController.getCheckoutSession);
+router.post('/paystack-webhook', orderController.handlePaystackWebhook);
+router.get('/verify-payment/:reference', authController.protect, orderController.verifyPayment);
 
-router.post('/flutterwave-webhook', orderController.handleFlutterwaveWebhook);
-   
 
 module.exports = router;

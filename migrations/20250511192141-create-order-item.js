@@ -2,6 +2,15 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+     // First check if the referenced tables exist
+    //  const tables = await queryInterface.showAllTables();
+    
+    //  if (!tables.includes('Orders') || !tables.includes('Products')) {
+    //    throw new Error('Referenced tables (Orders, Products) must exist before creating OrderItems');
+    //  }
+    await queryInterface.sequelize.query('SELECT 1 FROM `Orders` LIMIT 1').catch(() => {
+      throw new Error('Orders table must exist before creating OrderItems');
+    });
     await queryInterface.createTable('OrderItems', {
       id: {
         allowNull: false,
@@ -41,7 +50,7 @@ module.exports = {
         type: Sequelize.DECIMAL(12, 2)
       },
       selectedOptions: {
-        type: Sequelize.JSON
+        type: Sequelize.TEXT
       },
       createdAt: {
         allowNull: false,

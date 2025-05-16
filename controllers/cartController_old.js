@@ -379,3 +379,131 @@ await guestCart.destroy();
 
 
 });
+
+
+exports.mergeGuestCart = catchAsync(async (req, res, next) => {
+    const transaction = await sequelize.transaction();
+    try {
+      const userId = req.user?.id;
+      const sessionId = req.sessionId;
+  
+      if (!userId || !sessionId) {
+        await transaction.rollback();
+        return next(new AppError("Missing user or session info for merging carts", "", 400));
+      }
+  
+      // Find both carts within the transaction
+      const [guestCart, userCart] = await Promise.all([
+        Cart.findOne({
+          where: { sessionId },
+          // include: { model: CartItem, as: 'items' },
+          include: {
+            model: CartItem,
+            as: 'items',
+            include: [{
+              model: Product,
+              as: 'product',
+              attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity']
+            }]
+          },
+          transaction
+        }),
+        Cart.findOne({
+          where: { userId },
+          // include: { model: CartItem, as: 'items' },
+          include: {
+            model: CartItem,
+            as: 'items',
+            include: [{
+              model: Product,
+              as: 'product',
+              attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity']
+            }]
+          },
+          transaction
+        })
+      ]);
+  
+      // console.log('guest cart', guestCart.items);
+      // // console.log('user cart', userCart);
+  
+      // return res.status(200).json({
+      //   data:guestCart.items
+      // })
+      // return next();
+      
+      
+  
+      if (!guestCart) {
+        await transaction.commit(); // No changes made, just commit
+        return res.status(200).json({ status: "success", message: "No guest cart found to merge" });
+      }
+  
+      let resultCart;
+      let message;
+  
+      if (!userCart) {
+        // Assign guest cart to user
+        guestCart.userId = userId;
+        guestCart.sessionId = null;
+        guestCart.expiresAt = null;
+        await guestCart.save({ transaction });
+        
+        resultCart = guestCart;
+        message = "Guest cart assigned to user";
+      } else {
+        // Merge items
+        for (const guestItem of guestCart.items) {
+          const matchingItem = userCart.items.find(item =>
+            item.productId === guestItem.productId &&
+            item.selectedOptions === guestItem.selectedOptions
+          );
+  
+          if (matchingItem) {
+            matchingItem.quantity += guestItem.quantity;
+            await matchingItem.save({ transaction });
+            await guestItem.destroy({ transaction });
+          } else {
+            guestItem.cartId = userCart.id;
+            await guestItem.save({ transaction });
+          }
+        }
+  
+        // Get updated cart
+        resultCart = await Cart.findOne({
+          where: { userId },
+          // include: { model: CartItem, as: 'items' },
+          include: {
+            model: CartItem,
+            as: 'items',
+            include: [{
+              model: Product,
+              as: 'product',
+              attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity']
+            }]
+          },
+          transaction
+        });
+  
+        await guestCart.destroy({ transaction });
+        message = "Guest cart merged with user cart";
+      }
+  
+      await transaction.commit();
+  
+      res.status(200).json({
+        status: "success",
+        message,
+        data: {
+          items: resultCart.items,
+          summary: calculateCartSummary(resultCart.items)
+        }
+      });
+  
+    } catch (error) {
+      if (transaction.finished !== 'commit') {
+        await transaction.rollback();
+      }
+      next(error);
+    }
+  });

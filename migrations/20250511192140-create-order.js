@@ -57,10 +57,6 @@ module.exports = {
         defaultValue: 'pending'
       },
       deliveryAddress: {
-        type: Sequelize.JSON,
-        allowNull: false
-      },
-      contactPhone: {
         type: Sequelize.STRING,
         allowNull: false
       },

@@ -220,6 +220,31 @@ exports.protect = catchAsync(async(req, res, next) =>{
   next();
 });
 
+exports.maybeProtect = catchAsync(async (req, res, next) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  }
+
+  if (!token) {
+    return next(); // Guest access
+  }
+
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const currentUser = await User.findByPk(decoded.id);
+
+  if (!currentUser) {
+    return next(); // Treat as guest
+  }
+
+  req.user = currentUser;
+  next();
+});
+
+
+
 exports.logout = (req, res) => {
   res.cookie('jwt', 'loggedout', {
     expires: new Date(Date.now() + 10 * 1000),

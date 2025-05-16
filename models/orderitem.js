@@ -28,6 +28,10 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         notNull: { msg: 'Order ID is required' },
         isInt: { msg: 'Order ID must be an integer' }
+      },
+      references: {
+        model: 'Orders',
+        key: 'id'
       }
     },
     productId: {
@@ -36,6 +40,10 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         notNull: { msg: 'Product ID is required' },
         isInt: { msg: 'Product ID must be an integer' }
+      },
+      references: {
+        model: 'Products',
+        key: 'id'
       }
     },
     quantity: {
@@ -76,13 +84,15 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     selectedOptions: {
-      type: DataTypes.JSON,
-      validate: {
-        isValidOptions(value) {
-          if (value && typeof value !== 'object') {
-            throw new Error('Selected options must be a valid object');
-          }
-        }
+      type: DataTypes.TEXT,
+      defaultValue: '[]',
+      allowNull: true,
+      get() {
+        const rawValue = this.getDataValue('selectedOptions');
+        return rawValue ? JSON.parse(rawValue) : [];
+      },
+      set(value) {
+        this.setDataValue('selectedOptions', JSON.stringify(value || []));
       }
     }
   }, {

@@ -1,4 +1,4 @@
-const { Cart, CartItem, Product } = require('../models');
+const { Cart, CartItem, Product, sequelize } = require('../models');
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { getCartByUserOrSession, calculateCartSummary, getShippingOptions } = require('../utils/cartHelpers');
@@ -66,6 +66,8 @@ exports.addToCart = catchAsync(async (req, res, next) => {
 
 // Get user's or guest's cart
 exports.getCart = catchAsync(async (req, res, next) => {
+  
+  
   const userId = req.user?.id || null;
   const sessionId = req.sessionId;
 
@@ -190,72 +192,50 @@ exports.removeCartItem = catchAsync(async (req, res, next) => {
 
 // Merge guest cart with user's cart on login
 exports.mergeGuestCart = catchAsync(async (req, res, next) => {
-    const userId = req.user?.id;
-    const sessionId = req.sessionId;
+
+  const userId = req.user?.id;
+  const sessionId = req.sessionId;
+
+  if (!userId || !sessionId) {
+    return next(new AppError("Missing user or session info for merging carts", "", 400));
+  }
+
+  const guestCart = await Cart.findOne({
+    where: { sessionId },
+    include: {
+      model: CartItem,
+      as: 'items',
+      include: [{
+        model: Product,
+        as: 'product',
+        attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity']
+      }]
+    },
+  });
+
+  // const [userCart] = await Cart.findOrCreate({
+  //   where: { userId },
+  //   defaults: { userId }
+  // });
+
+
+    
+  if (!guestCart) {
+    return res.status(200).json({ status: "success", message: "No guest cart found to merge" });
+  }
+
   
-    if (!userId || !sessionId) {
-      return next(new AppError("Missing user or session info for merging carts", "", 400));
-    }
-  
-    // Find both carts: session cart (guest) and user cart (logged-in)
-    const guestCart = await Cart.findOne({
-      where: { sessionId },
-      include: { model: CartItem, as: 'items' }
-    });
-  
-    const userCart = await Cart.findOne({
-      where: { userId },
-      include: { model: CartItem, as: 'items' }
-    });
-  
-    if (!guestCart) {
-      // Nothing to merge
-      return res.status(200).json({ status: "success", message: "No guest cart found to merge" });
-    }
-  
-    if (!userCart) {
-      // If user has no cart, just assign the session cart to user
-      guestCart.userId = userId;
-      guestCart.sessionId = null;
-      guestCart.expiresAt = null;
-      await guestCart.save();
-  
-      return res.status(200).json({ status: "success", message: "Guest cart assigned to user" });
-    }
-  
-    // Merge items: add to user cart, combine duplicates
-    for (const guestItem of guestCart.items) {
-      const matchingItem = userCart.items.find(item =>
-        item.productId === guestItem.productId &&
-        item.selectedOptions === guestItem.selectedOptions
-      );
-  
-      if (matchingItem) {
-        // If item exists in both carts, increase quantity
-        matchingItem.quantity += guestItem.quantity;
-        await matchingItem.save();
-        await guestItem.destroy();
-      } else {
-        // Reassign guest item to user cart
-        guestItem.cartId = userCart.id;
-        await guestItem.save();
-      }
-    }
-  
-    // Delete guest cart after merging
-    await guestCart.destroy();
-  
-    const updatedCart = await getCartByUserOrSession(userId, null, true);
-    const summary = calculateCartSummary(updatedCart.items);
-  
-    res.status(200).json({
-      status: "success",
-      message: "Guest cart merged with user cart",
-      data: {
-        items: updatedCart.items,
-        summary
-      }
-    });
+  // Assign guest cart to user
+  guestCart.userId = userId;
+  guestCart.sessionId = null;
+  guestCart.expiresAt = null;
+  await guestCart.save();
+   
+  res.status(200).json({
+    status: "success",
+    message:"Guest cart assigned to user",
+  });
+
 });
 
 // Clear all items from a cart (user or session)

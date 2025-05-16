@@ -29,6 +29,7 @@ exports.enrichCartItems = (items) => {
 };
 // Utility to get cart by user or session, optionally including items
 exports.getCartByUserOrSession = async (userId, sessionId, withItems = false) => {
+
     const cart = await Cart.findOne({
       where: userId ? { userId } : { sessionId },
       include: withItems ? {

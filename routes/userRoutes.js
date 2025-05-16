@@ -16,11 +16,13 @@ router.get('/logout', authController.logout)
 router.post('/forgotPassword', authController.forgotPassword)
 router.route('/resetPassword/:token').patch(authController.resetPassword);
 
+router.get('/', userController.getAllUsers)
+router.get('/:id', userController.getUser)
 //Protect all the routes below
 router.use(authController.protect)
 
 router.patch('/:id/status', authController.restrictTo('admin'), userController.updateStatus)
-router.get('/', authController.restrictTo('admin'), userController.getAllUsers)
+
 
 
 module.exports = router;
