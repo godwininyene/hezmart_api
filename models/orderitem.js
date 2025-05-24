@@ -14,6 +14,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'productId',
         as: 'product'
       });
+
+      OrderItem.belongsTo(models.User, {
+        foreignKey: 'vendorId',
+        as: 'vendor'
+      });
+    
     }
 
     getTotalPrice() {
@@ -43,6 +49,18 @@ module.exports = (sequelize, DataTypes) => {
       },
       references: {
         model: 'Products',
+        key: 'id'
+      }
+    },
+      vendorId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      validate: {
+        notNull: { msg: 'Vendor ID is required' },
+        isInt: { msg: 'Vendor ID must be an integer' }
+      },
+      references: {
+        model: 'Users', 
         key: 'id'
       }
     },

@@ -47,6 +47,7 @@ exports.getAllProducts = catchAsync(async(req, res, next) => {
       attributes:['businessName', 'id']
     }
    ];
+   
 
     // Execute the query with count
     const { count, rows: products } = await Product.findAndCountAll(features.getOptions());

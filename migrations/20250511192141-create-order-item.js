@@ -2,15 +2,19 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-     // First check if the referenced tables exist
-    //  const tables = await queryInterface.showAllTables();
-    
-    //  if (!tables.includes('Orders') || !tables.includes('Products')) {
-    //    throw new Error('Referenced tables (Orders, Products) must exist before creating OrderItems');
-    //  }
+    // Verify required tables exist
     await queryInterface.sequelize.query('SELECT 1 FROM `Orders` LIMIT 1').catch(() => {
       throw new Error('Orders table must exist before creating OrderItems');
     });
+    await queryInterface.sequelize.query('SELECT 1 FROM `Products` LIMIT 1').catch(() => {
+      throw new Error('Products table must exist before creating OrderItems');
+    });
+    await queryInterface.sequelize.query('SELECT 1 FROM `Users` LIMIT 1').catch(() => {
+      throw new Error('Users table must exist (for vendor reference) before creating OrderItems');
+    });
+
+    
+
     await queryInterface.createTable('OrderItems', {
       id: {
         allowNull: false,
@@ -38,19 +42,39 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
       },
+      vendorId: {  // NEW FIELD
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'Users', 
+          key: 'id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT'
+      },
       quantity: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
+        validate: {
+          min: 1
+        }
       },
       price: {
         type: Sequelize.DECIMAL(12, 2),
-        allowNull: false
+        allowNull: false,
+        validate: {
+          min: 0
+        }
       },
       discountPrice: {
-        type: Sequelize.DECIMAL(12, 2)
+        type: Sequelize.DECIMAL(12, 2),
+        validate: {
+          min: 0
+        }
       },
       selectedOptions: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
+        defaultValue: '[]'
       },
       createdAt: {
         allowNull: false,
@@ -62,8 +86,9 @@ module.exports = {
       }
     });
 
-    // Add composite index for better performance
+    // Composite indexes for better query performance
     await queryInterface.addIndex('OrderItems', ['orderId', 'productId']);
+    await queryInterface.addIndex('OrderItems', ['vendorId']);
   },
 
   down: async (queryInterface, Sequelize) => {
