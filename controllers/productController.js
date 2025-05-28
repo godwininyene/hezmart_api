@@ -1,7 +1,7 @@
 const ProductService = require('../services/productService');
 const { parseField, handleFileUploads } = require('../utils/productHelpers');
 const APIFeatures = require("../utils/apiFeatures");
-const { Product,  User, Category } = require("../models");
+const { Product,  User, Category, Review } = require("../models");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { getProductIncludes } = require('../utils/productHelpers');
@@ -74,7 +74,8 @@ exports.getAllProducts = catchAsync(async(req, res, next) => {
 
 exports.getProduct = catchAsync(async(req, res, next) => {
   const product = await Product.findByPk(req.params.id, {
-    include: getProductIncludes()
+    include: getProductIncludes(),
+    order: [[{ model: Review, as: 'reviews' }, 'createdAt', 'DESC']]
   });
 
   if (!product) {

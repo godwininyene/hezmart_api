@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
       Review.belongsTo(models.User, {
         foreignKey: 'userId',
-        // as: 'user',
+        as: 'reviewUser',
         onDelete: 'CASCADE', // If user is deleted, delete their reviews
         onUpdate: 'CASCADE'
       });
@@ -21,7 +21,13 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Review.init({
-    review: DataTypes.STRING,
+    review:{
+      type: DataTypes.STRING,
+      allowNull:false,
+      validate:{
+        notNull:{msg: "Review cannot be empty"}
+      }
+    },
     rating:{
       type:DataTypes.INTEGER,
       validate: {

@@ -1,11 +1,11 @@
 const productController = require('./../controllers/productController');
 const authController = require('./../controllers/authController')
-
-
 const {uploadProductImages } = require('../utils/multerConfig');
+const reviewRouter = require('./reviewRoutes')
 const express = require('express');
 
 const router = express.Router();
+router.use('/:productId/reviews', reviewRouter);
 
 router.route('/')
     .get(authController.maybeProtect, productController.getAllProducts)

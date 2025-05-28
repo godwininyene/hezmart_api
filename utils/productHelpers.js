@@ -1,4 +1,5 @@
 const path = require('path');
+const {User} = require('./../models')
 
 exports.parseField = (field, value) => {
   if (value === undefined) return undefined;
@@ -37,6 +38,15 @@ exports.getProductIncludes = () => [
   { association: 'category', attributes: ['id', 'name'] },
   { association: 'subCategory', attributes: ['id', 'name'] },
   { association: 'user', attributes: ['id', 'firstName', 'lastName', 'businessName', 'businessLogo'] },
+  { association: 'reviews', attributes:['rating', 'review', 'id', 'createdAt'],
+    include:[
+     {
+       model:User,
+       as:'reviewUser',
+       attributes:['firstName', 'lastName', 'photo']
+     }
+    ]
+  },
   { 
     association: 'tags',
     attributes: ['id', 'name'],

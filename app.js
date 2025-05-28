@@ -7,6 +7,7 @@ const productRouter = require('./routes/productRoutes')
 const userRouter = require('./routes/userRoutes');
 const orderRouter = require('./routes/orderRoutes');
 const cartRouter = require('./routes/cartRoutes');
+const reviewRouter = require('./routes/reviewRoutes')
 const AppError = require('./utils/appError');
 const cookieParser = require('cookie-parser')
 const path = require('path')
@@ -51,6 +52,7 @@ app.use('/api/v1/subcategories', subcategoryRouter);
 app.use('/api/v1/products', productRouter);
 app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/orders', orderRouter);
+app.use('/api/v1/reviews', reviewRouter);
 
 app.all('*', (req, res, next)=>{
   next(new AppError(`The requested url ${req.originalUrl} was not found on this server!`, 'fail', 404))

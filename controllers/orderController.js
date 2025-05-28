@@ -41,7 +41,6 @@ const calculateCartTotals = (items) => {
 // Get all orders for current user
 exports.getUserOrders = catchAsync(async (req, res, next) => {
   const { role, id: userId } = req.user;
-
   const features = new APIFeatures(req.query, 'Order')
     .filter()
     .sort()

@@ -11,14 +11,14 @@ module.exports = {
       },
       review: {
         type: Sequelize.STRING,
-        allowNull:false
+        allowNull: false
       },
       rating: {
         type: Sequelize.INTEGER
       },
       productId: {
         type: Sequelize.INTEGER,
-        allowNull:false,
+        allowNull: false,
         references: {
           model: 'Products',
           key: 'id'
@@ -28,7 +28,7 @@ module.exports = {
       },
       userId: {
         type: Sequelize.INTEGER,
-        allowNull:false,
+        allowNull: false,
         references: {
           model: 'Users',
           key: 'id'
@@ -45,8 +45,19 @@ module.exports = {
         type: Sequelize.DATE
       }
     });
+
+    // 🟡 Add composite unique constraint on productId + userId
+    await queryInterface.addConstraint('Reviews', {
+      fields: ['productId', 'userId'],
+      type: 'unique',
+      name: 'unique_review_per_user_per_product'
+    });
   },
+
   async down(queryInterface, Sequelize) {
+    // Drop the constraint first
+    await queryInterface.removeConstraint('Reviews', 'unique_review_per_user_per_product');
+    // Then drop the table
     await queryInterface.dropTable('Reviews');
   }
 };
