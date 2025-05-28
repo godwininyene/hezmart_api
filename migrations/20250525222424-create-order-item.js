@@ -1,20 +1,7 @@
 'use strict';
-
+/** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
-    // Verify required tables exist
-    await queryInterface.sequelize.query('SELECT 1 FROM `Orders` LIMIT 1').catch(() => {
-      throw new Error('Orders table must exist before creating OrderItems');
-    });
-    await queryInterface.sequelize.query('SELECT 1 FROM `Products` LIMIT 1').catch(() => {
-      throw new Error('Products table must exist before creating OrderItems');
-    });
-    await queryInterface.sequelize.query('SELECT 1 FROM `Users` LIMIT 1').catch(() => {
-      throw new Error('Users table must exist (for vendor reference) before creating OrderItems');
-    });
-
-    
-
+  async up(queryInterface, Sequelize) {
     await queryInterface.createTable('OrderItems', {
       id: {
         allowNull: false,
@@ -22,7 +9,7 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      orderId: {
+     orderId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
@@ -42,17 +29,17 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
       },
-      vendorId: {  // NEW FIELD
+      vendorId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Users', 
+          model: 'Users',
           key: 'id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
       },
-      quantity: {
+       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
         validate: {
@@ -74,7 +61,43 @@ module.exports = {
       },
       selectedOptions: {
         type: Sequelize.TEXT,
-        defaultValue: '[]'
+        defaultValue: '{}'
+      },
+      fulfillmentStatus: {
+        type: Sequelize.ENUM('pending', 'processing', 'shipped', 'delivered', 'received', 'cancelled', 'returned'),
+        defaultValue: 'pending'
+      },
+      shippedAt: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      deliveredAt: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      receivedAt: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      trackingNumber: {
+        type: Sequelize.STRING(50),
+        allowNull: true
+      },
+      vendorNotes: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      customerNotes: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      cancellationReason: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      returnReason: {
+        type: Sequelize.TEXT,
+        allowNull: true
       },
       createdAt: {
         allowNull: false,
@@ -89,9 +112,12 @@ module.exports = {
     // Composite indexes for better query performance
     await queryInterface.addIndex('OrderItems', ['orderId', 'productId']);
     await queryInterface.addIndex('OrderItems', ['vendorId']);
+    await queryInterface.addIndex('OrderItems', ['fulfillmentStatus']);
+    await queryInterface.addIndex('OrderItems', ['shippedAt']);
+    await queryInterface.addIndex('OrderItems', ['deliveredAt']);
+    await queryInterface.addIndex('OrderItems', ['receivedAt']);
   },
-
-  down: async (queryInterface, Sequelize) => {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('OrderItems');
   }
 };

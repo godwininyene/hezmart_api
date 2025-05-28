@@ -1,10 +1,16 @@
 'use strict';
-const { Model } = require('sequelize');
-
+const {
+  Model
+} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class OrderItem extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
     static associate(models) {
-      // associations can be defined here
+      // define association here
       OrderItem.belongsTo(models.Order, {
         foreignKey: 'orderId',
         as: 'order'
@@ -19,14 +25,47 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'vendorId',
         as: 'vendor'
       });
-    
     }
 
     getTotalPrice() {
       return (this.discountPrice || this.price) * this.quantity;
     }
-  }
+    isValidStatusTransition(newStatus) {
+      const validTransitions = {
+        pending: ['processing'],
+        processing: ['shipped', 'cancelled'],
+        shipped: ['delivered', 'cancelled'],
+        delivered: ['received', 'returned'],
+        received: [],
+        cancelled: [],
+        returned: []
+      };
+      return validTransitions[this.fulfillmentStatus]?.includes(newStatus);
+    }
+    async updateStatus(newStatus, options = {}) {
+      if (!this.isValidStatusTransition(newStatus)) {
+        throw new Error(`Invalid status transition from ${this.fulfillmentStatus} to ${newStatus}`);
+      }
+
+      const updateData = { fulfillmentStatus: newStatus };
+
+      if (newStatus === 'shipped' && !this.shippedAt) {
+        updateData.shippedAt = new Date();
+      } else if (newStatus === 'delivered' && !this.deliveredAt) {
+        updateData.deliveredAt = new Date();
+      } else if (newStatus === 'received' && !this.receivedAt) {
+        console.log('Running here');
+        updateData.receivedAt = new Date();
+      }
+
+      // Merge extra fields from caller (e.g., vendorNotes or customerNotes)
+      Object.assign(updateData, options);
+
+      return this.update(updateData);
+    }
+
   
+  }
   OrderItem.init({
     orderId: {
       type: DataTypes.INTEGER,
@@ -52,7 +91,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-      vendorId: {
+    vendorId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
@@ -60,7 +99,7 @@ module.exports = (sequelize, DataTypes) => {
         isInt: { msg: 'Vendor ID must be an integer' }
       },
       references: {
-        model: 'Users', 
+        model: 'Users',
         key: 'id'
       }
     },
@@ -103,28 +142,107 @@ module.exports = (sequelize, DataTypes) => {
     },
     selectedOptions: {
       type: DataTypes.TEXT,
-      defaultValue: '[]',
+      defaultValue: '{}',
       allowNull: true,
       get() {
         const rawValue = this.getDataValue('selectedOptions');
-        return rawValue ? JSON.parse(rawValue) : [];
+        return rawValue ? JSON.parse(rawValue) : {};
       },
       set(value) {
-        this.setDataValue('selectedOptions', JSON.stringify(value || []));
+        this.setDataValue('selectedOptions', JSON.stringify(value || {}));
+      }
+    },
+   
+    fulfillmentStatus: {
+      type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'received', 'cancelled', 'returned'),
+      defaultValue: 'pending',
+      validate: {
+        isIn: {
+          args: [['pending', 'processing', 'shipped', 'delivered', 'received', 'cancelled', 'returned']],
+          msg: 'Invalid fulfillment status'
+        }
+      }
+    },
+    shippedAt: {
+      type: DataTypes.DATE,
+      validate: {
+        isDate: { msg: 'Shipped date must be a valid date' }
+      }
+    },
+    deliveredAt: {
+      type: DataTypes.DATE,
+      validate: {
+        isDate: { msg: 'Delivered date must be a valid date' }
+      }
+    },
+    receivedAt: {
+      type: DataTypes.DATE,
+      validate: {
+        isDate: { msg: 'Received date must be a valid date' }
+      }
+    },
+    trackingNumber: {
+      type: DataTypes.STRING,
+      validate: {
+        len: {
+          args: [0, 50],
+          msg: 'Tracking number cannot exceed 50 characters'
+        }
+      }
+    },
+    vendorNotes: {
+      type: DataTypes.TEXT,
+      validate: {
+        len: {
+          args: [0, 500],
+          msg: 'Vendor notes cannot exceed 500 characters'
+        }
+      }
+    },
+    customerNotes: {
+      type: DataTypes.TEXT,
+      validate: {
+        len: {
+          args: [0, 500],
+          msg: 'Customer notes cannot exceed 500 characters'
+        }
+      }
+    },
+    cancellationReason: {
+      type: DataTypes.TEXT,
+      validate: {
+        len: {
+          args: [0, 500],
+          msg: 'Cancellation reason cannot exceed 500 characters'
+        }
+      }
+    },
+    returnReason: {
+      type: DataTypes.TEXT,
+      validate: {
+        len: {
+          args: [0, 500],
+          msg: 'Return reason cannot exceed 500 characters'
+        }
       }
     }
   }, {
     sequelize,
     modelName: 'OrderItem',
-    hooks: {
+    hooks:{
       beforeCreate: async (orderItem) => {
-        // If discount price is not provided, set it to null
         if (orderItem.discountPrice === undefined || orderItem.discountPrice === 0) {
           orderItem.discountPrice = null;
+        }
+      },
+      afterUpdate: async (orderItem) => {
+        if (orderItem.changed('fulfillmentStatus')) {
+          const order = await orderItem.getOrder();
+          const newOrderStatus = await order.calculateOrderStatus();
+          await order.update({ status: newOrderStatus });
         }
       }
     }
   });
-  
   return OrderItem;
 };

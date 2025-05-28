@@ -397,7 +397,7 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       vendorOrdersMap.get(vendorId).items.push(item);
     });
 
-    console.log('Vendor maps',vendorOrdersMap);
+
     
 
     // Get all vendors in one query
@@ -406,6 +406,7 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       where: { id: vendorIds },
       attributes: ['id', 'email', 'firstName']
     });
+    
 
     // Send notifications to each vendor
     await Promise.all(

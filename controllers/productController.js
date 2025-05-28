@@ -47,7 +47,14 @@ exports.getAllProducts = catchAsync(async(req, res, next) => {
       attributes:['businessName', 'id']
     }
    ];
-   
+
+    // Restrict products for vendors to only their own
+    if (req.user?.role === 'vendor') {
+      features.queryOptions.where = {
+        ...features.queryOptions.where,
+        userId: req.user.id  // Ensure only vendor's products are returned
+      };
+    }
 
     // Execute the query with count
     const { count, rows: products } = await Product.findAndCountAll(features.getOptions());

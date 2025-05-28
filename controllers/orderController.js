@@ -5,6 +5,7 @@ const axios = require('axios');
 const Sequelize = require('sequelize');
 const generatePaginationMeta = require('../utils/pagination');
 const APIFeatures = require("../utils/apiFeatures");
+const Email = require('./../utils/email')
 
 // Helper function to calculate cart totals
 const calculateCartTotals = (items) => {
@@ -47,7 +48,7 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
     .limitFields()
     .paginate();
 
-  // Base include structure
+  // Base include structure with enhanced OrderItem fields
   features.queryOptions.include = [
     {
       model: OrderItem,
@@ -61,32 +62,70 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
         {
           model: User,
           as: 'vendor',
-          attributes: ['businessName', 'businessLogo']
+          attributes: ['id', 'businessName', 'businessLogo']
         }
       ]
     },
     {
       model: User,
       as: 'user',
-      attributes: ['firstName', 'lastName', 'photo']
+      attributes: ['id', 'firstName', 'lastName', 'photo']
     }
   ];
- 
-  // Determine WHERE condition based on user role
+
+  // Role-based filtering
   if (role === 'admin') {
-    // No filtering for admin — all orders
-    features.queryOptions.where = features.queryOptions.where;
+    // Admin sees all orders with all items
+    features.queryOptions.where = features.queryOptions.where || {};
   } else if (role === 'vendor') {
-    // Filter orders where any item has vendorId === current user
+    // Vendor sees only their items with parent order info
     features.queryOptions.include[0].where = { vendorId: userId };
+    features.queryOptions.include[0].required = true; // Inner join to filter orders
+    
+    // For vendor view, we want to see the order even if some items are from other vendors
+    features.queryOptions.distinct = true;
   } else {
-    // Regular user - fetch only their own orders
+    // Customer sees only their own orders
     features.queryOptions.where = { userId };
+  }
+
+  // Add status-based filtering if requested
+  if (req.query.status) {
+    const statusMap = {
+      'pending': ['pending'],
+      'processing': ['processing'],
+      'shipped': ['partially_shipped', 'shipped'],
+      'delivered': ['partially_delivered', 'delivered'],
+      'received': ['partially_received', 'completed'],
+      'cancelled': ['partially_cancelled', 'cancelled']
+    };
+    
+    const statuses = statusMap[req.query.status] || [req.query.status];
+    features.queryOptions.where = {
+      ...features.queryOptions.where,
+      status: { [Sequelize.Op.in]: statuses }
+    };
   }
 
   // Execute the query with count
   const { count, rows: orders } = await Order.findAndCountAll(features.getOptions());
-  
+
+  // For vendor view, group items by vendor (though they'll only see their own)
+  if (role === 'vendor') {
+    orders.forEach(order => {
+      order.dataValues.vendorItems = {};
+      order.items.forEach(item => {
+        if (!order.dataValues.vendorItems[item.vendorId]) {
+          order.dataValues.vendorItems[item.vendorId] = {
+            vendor: item.vendor,
+            items: []
+          };
+        }
+        order.dataValues.vendorItems[item.vendorId].items.push(item);
+      });
+    });
+  }
+
   const { page, limit } = features.getPaginationInfo();
   const pagination = generatePaginationMeta({ count, page, limit, req });
 
@@ -94,7 +133,12 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
     status: 'success',
     pagination,
     data: {
-      orders
+      orders,
+      // Include role-specific metadata
+      meta: role === 'vendor' ? { 
+        isVendorView: true,
+        totalItems: count 
+      } : null
     }
   });
 });
@@ -154,7 +198,9 @@ exports.getOrder = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    data: order
+    data:{
+      order
+    }
   });
 });
 
@@ -204,7 +250,7 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
   });
 
   if (!cart || !cart.items || cart.items.length === 0) {
-    return next(new AppError('Your cart is empty','', 400));
+    return next(new AppError('Your cart is empty', '', 400));
   }
 
   // 2) Calculate totals
@@ -229,113 +275,174 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
 
   // 5) Calculate final total
   const total = calculations.subtotal - calculations.discount + deliveryFee;
-  const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const orderNumber = await Order.generateOrderNumber();
 
   // 6) Create pending order record
-  const order = await Order.create({
-    userId,
-    orderNumber,
-    status: 'pending',
-    subtotal: calculations.subtotal,
-    discount: calculations.discount,
-    deliveryFee,
-    tax: 0,
-    total,
-    paymentMethod,
-    paymentStatus: 'pending',
-    deliveryAddress
-  });
-
-  // Create order items
-  await Promise.all(cart.items.map(item =>
-    OrderItem.create({
-      orderId: order.id,
-      productId: item.productId,
-      vendorId: item.product.userId,
-      quantity: item.quantity,
-      price: item.product.price,
-      discountPrice: item.product.discountPrice,
-      selectedOptions: item.selectedOptions || []
-    })
-  ));
-
-  // ✅ 7) Create or update Paystack customer
-  const customerPayload = {
-    email: req.user.email,
-    first_name: req.user.firstName,
-    last_name: req.user.lastName,
-    phone: req.user.primaryPhone || ''  // optional
-  };
-
-  try {
-    await axios.post('https://api.paystack.co/customer', customerPayload, {
-      headers: {
-        Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
-        'Content-Type': 'application/json'
-      }
+    const order = await Order.create({
+      userId,
+      orderNumber,
+      status: 'pending',
+      subtotal: calculations.subtotal,
+      discount: calculations.discount,
+      deliveryFee,
+      tax: 0,
+      total,
+      paymentMethod,
+      paymentStatus: 'pending',
+      deliveryAddress,
     });
-  } catch (err) {
-    console.error('Failed to create Paystack customer:', err.response?.data || err.message);
-    // Throw or proceed depending on how critical this is
-  }
 
-  // 8) Prepare Paystack payload
-  const payload = {
-    email: req.user.email,
-    amount: total * 100,
-    reference: orderNumber,
-    callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
-    metadata: {
-      custom_fields: [
-        {
-          display_name: "Customer Name",
-          variable_name: "customer_name",
-          value: `${req.user.firstName} ${req.user.lastName}`
-        },
-        {
-          display_name: "Order ID",
-          variable_name: "order_id",
-          value: order.id
+    //7 Create order items
+    await Promise.all(cart.items.map(item =>
+      OrderItem.create({
+        orderId: order.id,
+        productId: item.productId,
+        vendorId: item.product.userId,
+        quantity: item.quantity,
+        price: item.product.price,
+        discountPrice: item.product.discountPrice,
+        selectedOptions: item.selectedOptions || {},
+        fulfillmentStatus: 'pending'
+      })
+    ));
+
+    //8) Process stock updates in batches
+    await Promise.all(cart.items.map(item => 
+        Product.decrement('stockQuantity', {
+        by: item.quantity,
+        where: { id: item.productId },
+      })
+    ));
+
+    // Prepare vendor notifications data
+    const vendorOrdersMap = new Map();
+    cart.items.forEach(item => {
+      const vendorId = item.product.userId;
+      if (!vendorOrdersMap.has(vendorId)) {
+        vendorOrdersMap.set(vendorId, {
+          vendorId,
+          items: []
+        });
+      }
+      vendorOrdersMap.get(vendorId).items.push(item.get({ plain: true }));
+    });
+
+    // Get all vendors in one query
+    const vendorIds = Array.from(vendorOrdersMap.keys());
+    const vendors = await User.findAll({
+      where: { id: vendorIds },
+      attributes: ['id', 'email', 'firstName']
+    });
+
+     // Send notifications to each vendor
+    await Promise.all(
+      vendors.map(async vendor => {
+        const vendorItems = vendorOrdersMap.get(vendor.id).items;
+        const vendorOrderTotal = vendorItems.reduce((sum, item) => {
+          return sum + (item.product.discountPrice || item.product.price) * item.quantity;
+        }, 0);
+
+        // Calculate total for each item
+        vendorItems.forEach(item => {
+          const unitPrice = item.product.discountPrice || item.product.price;
+          item.total = unitPrice * item.quantity;
+        });
+
+        try {
+          await new Email(
+            vendor,
+            null,
+            `${process.env.FRONTEND_URL}/vendor/orders`,
+            'new_order'
+          ).sendVendorOrderNotification({
+            subject: `🎉 New Order Received (${orderNumber})`,
+            orderNumber,
+            orderTotal: vendorOrderTotal,
+            items: vendorItems,
+            customerName: `${req.user.firstName} ${req.user.lastName}`
+          });
+        } catch (emailError) {
+          console.error(`Failed to send email to vendor ${vendor.email}:`, emailError);
         }
-      ],
-      userId: req.user.id,
-      cartId: cart.id,
-      deliveryAddress: JSON.stringify(deliveryAddress),
-      paymentMethod
-    }
-  };
+      })
+    );
+    
+    // 9) Create or update Paystack customer
+    const customerPayload = {
+      email: req.user.email,
+      first_name: req.user.firstName,
+      last_name: req.user.lastName,
+      phone: req.user.primaryPhone || ''
+    };
 
-  // 9) Call Paystack API
-  try {
-    const response = await axios.post(
-      'https://api.paystack.co/transaction/initialize',
-      payload,
-      {
+    try {
+      await axios.post('https://api.paystack.co/customer', customerPayload, {
         headers: {
           Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
           'Content-Type': 'application/json'
         }
-      }
-    );
-
-    // Clear the cart if transaction was initialized successfully
-    if (response.data.status) {
-      await Cart.destroy({ where: { userId: order.userId } });
+      });
+    } catch (err) {
+      console.error('Failed to create Paystack customer:', err.response?.data || err.message);
     }
 
-    res.status(200).json({
-      status: "success",
-      data: {
-        checkoutUrl: response.data.data.authorization_url,
-        orderId: order.id,
-        reference: orderNumber
+    // 10) Prepare Paystack payload
+    const payload = {
+      email: req.user.email,
+      amount: total * 100,
+      reference: orderNumber,
+      callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
+      metadata: {
+        custom_fields: [
+          {
+            display_name: "Customer Name",
+            variable_name: "customer_name",
+            value: `${req.user.firstName} ${req.user.lastName}`
+          },
+          {
+            display_name: "Order ID",
+            variable_name: "order_id",
+            value: order.id
+          }
+        ],
+        userId: req.user.id,
+        cartId: cart.id,
+        deliveryAddress: JSON.stringify(deliveryAddress),
+        paymentMethod
       }
-    });
-  } catch (error) {
-    //If paystack failed, mark order as failed
-    await order.update({ status: 'failed' });
-    throw error;
-  }
+    };
+
+    // 11) Call Paystack API
+    try {
+      const response = await axios.post(
+        'https://api.paystack.co/transaction/initialize',
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // 12) Clear the cart if transaction was initialized successfully
+      if (response.data.status) {
+        await Cart.destroy({ where: { userId: order.userId } });
+      }
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          checkoutUrl: response.data.data.authorization_url,
+          orderId: order.id,
+          reference: orderNumber
+        }
+      });
+    } catch (error) {
+      //If paystack failed, mark order as failed
+      await order.update({ status: 'failed' });
+      throw error;
+    }
 });
 
 // Handle Paystack webhook
@@ -437,3 +544,101 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+
+
+// Update order item status
+exports.updateItemStatus = catchAsync(async (req, res, next) => {
+  const { itemId } = req.params;
+  const { status, notes } = req.body;
+  const { id: userId, role } = req.user;
+
+
+  // 1) Find the order item with necessary fields
+  const item = await OrderItem.findOne({
+    where: { id: itemId },
+    include: [{
+      model: Order,
+      as: 'order',
+      attributes: ['id', 'userId']
+    }]
+  });
+  
+
+  if (!item) {
+    return next(new AppError('Order item not found', '', 404));
+  }
+
+  // 2) Authorization check
+  if (role === 'customer') {
+    if (status !== 'received') {
+      return next(new AppError('You can only mark items as received', '', 403));
+    }
+    if (item.order.userId !== userId) {
+      return next(new AppError('Not authorized to update this item', '', 403));
+    }
+  } else if (role === 'vendor') {
+    if (item.vendorId !== userId) {
+      return next(new AppError('Not authorized to update this item', '', 403));
+    }
+    if (status === 'received') {
+      return next(new AppError('Vendors cannot mark items as received', '', 403));
+    }
+  }
+
+  // 3) Prepare update data
+  const updateData = {};
+  if (notes) {
+    if (role === 'vendor') {
+      updateData.vendorNotes = notes;
+    } else if (role === 'customer') {
+      updateData.customerNotes = notes;
+    }
+  }
+
+  try {
+    // 4) Use the model's updateStatus method
+    await item.updateStatus(status, updateData);
+   
+    // 5) Return updated item
+    const updatedItem = await OrderItem.findByPk(itemId, {
+      include: [
+        { 
+          model: Order, 
+          as: 'order', 
+          attributes: ['id', 'status', 'orderNumber'] 
+        },
+        { 
+          model: Product, 
+          as: 'product', 
+          attributes: ['id', 'name'] 
+        }
+      ]
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        item: updatedItem,
+        orderStatus: updatedItem.order.status 
+      }
+    });
+  } catch (error) {
+    if (error.message.includes('Invalid status transition')) {
+      return next(new AppError(error.message, '', 400));
+    }
+    throw error;
+  }
+});
+
+  // const testMap = new Map();
+  // testMap.set('vendor1', {
+  //   vendor1:'vendor1',
+  //   items:['item1', 'item2']
+  // })
+  //  testMap.set('vendor2', {
+  //   vendor1:'vendor2',
+  //   items:['item1', 'item2']
+  // })
+  // console.log(testMap);
+  

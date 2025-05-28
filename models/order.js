@@ -1,10 +1,16 @@
 'use strict';
-const { Model, Op } = require('sequelize');
-
+const {
+  Model
+} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class Order extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
     static associate(models) {
-      // associations can be defined here
+      // define association here
       Order.belongsTo(models.User, { 
         foreignKey: 'userId',
         as: 'user'
@@ -13,16 +19,6 @@ module.exports = (sequelize, DataTypes) => {
       Order.hasMany(models.OrderItem, {
         foreignKey: 'orderId',
         as: 'items'
-      });
-      
-      Order.hasOne(models.Payment, {
-        foreignKey: 'orderId',
-        as: 'payment'
-      });
-      
-      Order.hasOne(models.Shipment, {
-        foreignKey: 'orderId',
-        as: 'shipment'
       });
     }
 
@@ -33,25 +29,37 @@ module.exports = (sequelize, DataTypes) => {
       return `${prefix}-${timestamp}-${random}`;
     }
 
-    async calculateTotals() {
+    async calculateOrderStatus() {
       const items = await this.getItems();
-      let subtotal = 0;
-      let discount = 0;
       
-      items.forEach(item => {
-        subtotal += item.price * item.quantity;
-        if (item.discountPrice) {
-          discount += (item.price - item.discountPrice) * item.quantity;
-        }
-      });
-      
-      this.subtotal = subtotal;
-      this.discount = discount;
-      this.total = subtotal - discount + (this.deliveryFee || 0) + (this.tax || 0);
-      return this;
+      if (items.every(item => item.fulfillmentStatus === 'received')) {
+        return 'completed';
+      }
+      if (items.every(item => ['received', 'returned'].includes(item.fulfillmentStatus))) {
+        return 'closed';
+      }
+      if (items.some(item => item.fulfillmentStatus === 'received')) {
+        return 'partially_received';
+      }
+      if (items.every(item => item.fulfillmentStatus === 'delivered')) {
+        return 'delivered';
+      }
+      if (items.some(item => item.fulfillmentStatus === 'delivered')) {
+        return 'partially_delivered';
+      }
+      if (items.some(item => item.fulfillmentStatus === 'shipped')) {
+        return 'partially_shipped';
+      }
+      if (items.every(item => item.fulfillmentStatus === 'processing')) {
+        return 'processing';
+      }
+      if (items.some(item => item.fulfillmentStatus === 'cancelled')) {
+        return items.every(item => 
+          item.fulfillmentStatus === 'cancelled') ? 'cancelled' : 'partially_cancelled';
+      }
+      return 'pending';
     }
   }
-  
   Order.init({
     userId: {
       type: DataTypes.INTEGER,
@@ -65,7 +73,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    orderNumber: {
+      orderNumber: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
@@ -74,12 +82,39 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Order number cannot be empty' }
       }
     },
+ 
     status: {
-      type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'),
+      type: DataTypes.ENUM(
+        'pending',
+        'processing',
+        'partially_shipped',
+        'shipped',
+        'partially_delivered',
+        'delivered',
+        'partially_received',
+        'completed',
+        'partially_cancelled',
+        'cancelled',
+        'closed',
+        'refunded'
+      ),
       defaultValue: 'pending',
       validate: {
         isIn: {
-          args: [['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded']],
+          args: [[
+            'pending',
+            'processing',
+            'partially_shipped',
+            'shipped',
+            'partially_delivered',
+            'delivered',
+            'partially_received',
+            'completed',
+            'partially_cancelled',
+            'cancelled',
+            'closed',
+            'refunded'
+          ]],
           msg: 'Invalid order status'
         }
       }
@@ -95,7 +130,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    discount: {
+   discount: {
       type: DataTypes.DECIMAL(12, 2),
       defaultValue: 0.00,
       validate: {
@@ -105,7 +140,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    deliveryFee: {
+     deliveryFee: {
       type: DataTypes.DECIMAL(12, 2),
       defaultValue: 0.00,
       validate: {
@@ -115,7 +150,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    tax: {
+     tax: {
       type: DataTypes.DECIMAL(12, 2),
       defaultValue: 0.00,
       validate: {
@@ -125,7 +160,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    total: {
+     total: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       validate: {
@@ -178,8 +213,6 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         notNull: { msg: 'Delivery address is required' },
         isValidAddress(value) {
-        
-          
           let addressObj;
           try {
             addressObj = typeof value === 'string' ? JSON.parse(value) : value;
@@ -198,62 +231,35 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
-    trackingNumber: {
+      trackingNumber: {
       type: DataTypes.STRING,
       validate: {
         notEmpty: { msg: 'Tracking number cannot be empty if provided' }
       }
     },
-    notes: {
+     customerNotes: {
       type: DataTypes.TEXT,
       validate: {
         len: {
           args: [0, 500],
-          msg: 'Notes cannot exceed 500 characters'
+          msg: 'Customer notes cannot exceed 500 characters'
         }
       }
     }
   }, {
     sequelize,
     modelName: 'Order',
-    paranoid: true,
-    hooks: {
-      beforeCreate: async (order) => {
-        if (!order.orderNumber) {
-          order.orderNumber = await Order.generateOrderNumber();
-        }
-      },
-      beforeSave: async (order) => {
-        if (order.changed('status') && order.status === 'cancelled') {
-          order.paymentStatus = 'refunded';
-        }
-      },
-      afterCreate: async (order) => {
-        // Create payment record if needed
-        const { Payment } = sequelize.models;
-        if (order.paymentMethod !== 'cash_on_delivery') {
-          await Payment.create({
-            orderId: order.id,
-            amount: order.total,
-            status: 'pending',
-            method: order.paymentMethod
-          });
-        }
-      }
-    },
-    scopes: {
-      withItems: {
-        include: ['items']
-      },
-      active: {
-        where: {
-          status: {
-            [Op.notIn]: ['cancelled', 'refunded']
+    hooks:{
+      afterUpdate: async (order) => {
+        // Update order status based on items when relevant fields change
+        if (order.changed('status') || order.changed('paymentStatus')) {
+          const newStatus = await order.calculateOrderStatus();
+          if (newStatus !== order.status) {
+            await order.update({ status: newStatus });
           }
         }
       }
     }
   });
-  
   return Order;
 };

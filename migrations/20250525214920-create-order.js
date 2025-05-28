@@ -1,7 +1,7 @@
 'use strict';
-
+/** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
+  async up(queryInterface, Sequelize) {
     await queryInterface.createTable('Orders', {
       id: {
         allowNull: false,
@@ -25,7 +25,20 @@ module.exports = {
         unique: true
       },
       status: {
-        type: Sequelize.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'),
+        type: Sequelize.ENUM(
+          'pending',
+          'processing',
+          'partially_shipped',
+          'shipped',
+          'partially_delivered',
+          'delivered',
+          'partially_received',
+          'completed',
+          'partially_cancelled',
+          'cancelled',
+          'closed',
+          'refunded'
+        ),
         defaultValue: 'pending'
       },
       subtotal: {
@@ -57,14 +70,16 @@ module.exports = {
         defaultValue: 'pending'
       },
       deliveryAddress: {
-        type: Sequelize.STRING,
+        type: Sequelize.TEXT,
         allowNull: false
       },
       trackingNumber: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        allowNull:true
       },
-      notes: {
-        type: Sequelize.TEXT
+      customerNotes: {
+        type: Sequelize.TEXT,
+        allowNull:true
       },
       createdAt: {
         allowNull: false,
@@ -73,20 +88,17 @@ module.exports = {
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE
-      },
-      deletedAt: {
-        type: Sequelize.DATE
       }
     });
 
-    // Add index for faster queries
     await queryInterface.addIndex('Orders', ['userId']);
     await queryInterface.addIndex('Orders', ['orderNumber']);
     await queryInterface.addIndex('Orders', ['status']);
     await queryInterface.addIndex('Orders', ['paymentStatus']);
+    await queryInterface.addIndex('Orders', ['createdAt']);
+    await queryInterface.addIndex('Orders', ['updatedAt']);
   },
-
-  down: async (queryInterface, Sequelize) => {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('Orders');
   }
 };
