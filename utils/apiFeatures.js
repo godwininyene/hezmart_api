@@ -8,7 +8,8 @@ class APIFeatures {
         this.modelName = modelName; // Store the model name
         this.queryOptions = {
             where: {},
-            include: []
+            include: [],
+            distinct:true
         };
 
         this.paginationInfo = {};
