@@ -104,7 +104,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     ratingsAverage: {
       type: DataTypes.FLOAT,
-      defaultValue: 4.5,
+      defaultValue: 1.1,
       validate: {
         min: {
           args: [1],
