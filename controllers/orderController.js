@@ -1,5 +1,5 @@
 const catchAsync = require("../utils/catchAsync");
-const { Cart, CartItem, Product, Order, OrderItem, sequelize, User } = require('../models');
+const { Cart, CartItem, Product, Order, OrderItem, sequelize, User, Review } = require('../models');
 const AppError = require("../utils/appError");
 const axios = require('axios');
 const Sequelize = require('sequelize');
@@ -159,7 +159,12 @@ exports.getOrder = catchAsync(async (req, res, next) => {
           {
             model: Product,
             as: 'product',
-            attributes: ['id', 'name', 'coverImage']
+            attributes: ['id', 'name', 'coverImage'],
+            include:{
+              model:Review,
+              as:'reviews',
+              attributes:['id', 'rating', 'review', 'userId']
+            }
           },
           {
             model: User,
