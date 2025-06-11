@@ -2,35 +2,22 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Carts', {
+    await queryInterface.createTable('CouponRedemptions', {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER
       },
+      couponId: {
+        type: Sequelize.INTEGER
+      },
       userId: {
-        type: Sequelize.INTEGER,
-        allowNull: true, 
-        references: {
-          model: 'Users',
-          key: 'id'
-        }
+        type: Sequelize.INTEGER
       },
-      sessionId: {
-        type: Sequelize.STRING, 
-        allowNull: true,
-        unique: true
-      },
-      expiresAt: {
+      redeemedAt: {
         type: Sequelize.DATE,
-        allowNull: true
-      },
-      couponId:{
-      type:Sequelize.INTEGER
-      },
-      discountAmount:{
-        type:Sequelize.DECIMAL(10, 2)
+        defaultValue:Sequelize.NOW
       },
       createdAt: {
         allowNull: false,
@@ -43,6 +30,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Carts');
+    await queryInterface.dropTable('CouponRedemptions');
   }
 };

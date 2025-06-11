@@ -39,6 +39,8 @@ exports.getAllUsers = catchAsync(async(req, res, next)=>{
 });
 
 exports.getUser = catchAsync(async(req, res, next)=>{
+    console.log(req.user);
+    
     const user = await User.findByPk(req.params.id)
     if(!user){
         return next(new AppError('No user was found with that ID', '', 404));
@@ -158,6 +160,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         'email', 
         'primaryPhone', 
         'secondaryPhone', 
+        'country',
         'city', 
         'primaryAddress', 
         'secondaryAddress',
@@ -169,8 +172,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     // Handle file upload if present
     if (req.file) filteredBody.photo = req.file.filename;
 
-    // 3) Update user document using Sequelize
-    
+    // 3) Update user document 
     const user = await User.findByPk(req.user.id);
     if (!user) {
         return next(new AppError('User not found', '', 404));
@@ -197,3 +199,8 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         }
     });
 });
+
+exports.getMe = (req, res, next)=>{
+    req.params.id = req.user.id;
+    next();
+}

@@ -2,6 +2,7 @@ const express = require('express');
 const authController = require('./../controllers/authController');
 const userController = require('./../controllers/userController');
 const { uploadBusinessLogo } = require('../utils/multerConfig');
+const {uploadUserPhoto } = require('../utils/multerConfig');
 const router = express.Router();
 
 router.post(
@@ -15,13 +16,20 @@ router.post('/login', authController.login)
 router.get('/logout', authController.logout)
 router.post('/forgotPassword', authController.forgotPassword)
 router.route('/resetPassword/:token').patch(authController.resetPassword);
+router.patch('/updateMyPassword',authController.protect, authController.updatePassword);
 
 router.get('/', userController.getAllUsers)
+router.route('/me').get(authController.protect,userController.getMe, userController.getUser);
 router.get('/:id', userController.getUser)
-//Protect all the routes below
-router.use(authController.protect)
 
-router.patch('/:id/status', authController.restrictTo('admin'), userController.updateStatus)
+router
+.patch('/updateMe',
+    authController.protect,
+    uploadUserPhoto, 
+    userController.updateMe
+);
+
+router.patch('/:id/status',authController.protect, authController.restrictTo('admin'), userController.updateStatus)
 
 
 

@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
       Cart.belongsTo(models.User, { foreignKey: 'userId' ,  onDelete: 'CASCADE'});
       Cart.hasMany(models.CartItem, { foreignKey: 'cartId', as: 'items' });
+      Cart.belongsTo(models.Coupon, { foreignKey: 'couponId', as:'coupon' });
     }
   }
   Cart.init({
@@ -27,6 +28,12 @@ module.exports = (sequelize, DataTypes) => {
     expiresAt: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    couponId:{
+      type:DataTypes.INTEGER
+    },
+    discountAmount:{
+      type:DataTypes.DECIMAL(10, 2)
     }
   }, {
     sequelize,

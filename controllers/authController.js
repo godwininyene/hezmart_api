@@ -334,6 +334,27 @@ exports.resetPassword = catchAsync(async(req, res, next)=>{
 })
 
 
+exports.updatePassword =catchAsync(async(req, res, next)=>{
+  // 1) Get user from collection
+  const user = await User.scope('withPassword').findByPk(req.user.id);
+
+  // 2) Check if POSTed current password is correct
+  if (!(await user.correctPassword(req.body.passwordCurrent, user.password))) {
+      return next(new AppError('', {passwordCurrent:'Your current password is wrong.'}, 401));
+  }
+
+  // 3) If so, update password
+  user.password = req.body.password;
+  user.passwordConfirm = req.body.passwordConfirm;
+
+  await user.save();
+  // User.findByIdAndUpdate will NOT work as intended!
+
+  // 4) Log user in, send JWT
+  createSendToken(user, req, res, 200)
+})
+
+
 // In your authController.js
 exports.createAdmin = catchAsync(async (req, res, next) => {
   // Only allow existing admins to create new admins

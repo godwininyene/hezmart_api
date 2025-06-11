@@ -20,6 +20,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'orderId',
         as: 'items'
       });
+      Order.belongsTo(models.Coupon, {
+        foreignKey: 'couponId',
+        as: 'coupon'
+      });
     }
 
     static async generateOrderNumber() {
@@ -192,6 +196,8 @@ module.exports = (sequelize, DataTypes) => {
         }
       }
     },
+    couponId: DataTypes.INTEGER,
+    couponCode: DataTypes.STRING,
     deliveryAddress: {
       type: DataTypes.TEXT,
       allowNull: false,

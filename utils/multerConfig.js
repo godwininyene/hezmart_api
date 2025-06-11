@@ -15,6 +15,8 @@ const storage = multer.diskStorage({
             cb(null, 'public/uploads/products/images');
         }else if(file.fieldname === 'catIcon'){
             cb(null, 'public/uploads/categoryIcons')
+        }else if(file.fieldname === 'photo'){
+            cb(null, 'public/uploads/users')
         }
     },
     filename: (req, file, cb) => {
@@ -57,3 +59,4 @@ exports.uploadProductImages = upload.fields([
 ]);
 
 exports.uploadCategoryIcon = upload.single('catIcon');
+exports.uploadUserPhoto = upload.single('photo');

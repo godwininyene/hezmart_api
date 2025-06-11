@@ -8,6 +8,12 @@ module.exports = (sequelize, DataTypes) => {
       Category.hasMany(models.SubCategory, {as: 'subcategories'});
       Category.hasMany(models.Product, {foreignKey: 'categoryId',as: 'products'});
       Category.hasMany(models.User, { foreignKey: 'businessCategoryId', as: 'users' })
+      Category.belongsToMany(models.Coupon, {
+        through: 'CouponCategories',
+        foreignKey: 'categoryId',
+        otherKey: 'couponId',
+        as: 'coupons'
+      });
     }
   }
   Category.init({

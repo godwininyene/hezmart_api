@@ -55,6 +55,14 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: 'CASCADE', // If product is deleted, delete its options
         onUpdate: 'CASCADE'
       });
+
+      Product.belongsToMany(models.Coupon, {
+        through: 'CouponProducts',
+        foreignKey: 'productId',
+        otherKey: 'couponId',
+        as: 'coupons'
+      });
+      
     }
   }
   Product.init({
@@ -86,11 +94,15 @@ module.exports = (sequelize, DataTypes) => {
     },
     discountPrice: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull:true,
+      allowNull: true,
+      defaultValue: null,  
       validate: {
-        min: { args: [0], msg: 'Discount price cannot be negative' },
+        min: { 
+          args: [0], 
+          msg: 'Discount price cannot be negative' 
+        },
         isLessThanPrice(value) {
-          if (value && parseFloat(value) >= parseFloat(this.price)) {
+          if (value !== null && parseFloat(value) >= parseFloat(this.price)) {
             throw new Error('Discount price must be less than regular price');
           }
         }

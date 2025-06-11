@@ -66,8 +66,7 @@ exports.addToCart = catchAsync(async (req, res, next) => {
 
 // Get user's or guest's cart
 exports.getCart = catchAsync(async (req, res, next) => {
-  
-  
+
   const userId = req.user?.id || null;
   const sessionId = req.sessionId;
 
@@ -91,7 +90,8 @@ exports.getCart = catchAsync(async (req, res, next) => {
     });
   }
 
-  const summary = calculateCartSummary(cart.items);
+  // Calculate summary including any cart-level discount
+  const summary = calculateCartSummary(cart.items, cart.discountAmount);
 
   res.status(200).json({
     status: "success",
@@ -99,7 +99,15 @@ exports.getCart = catchAsync(async (req, res, next) => {
       items: cart.items,
       summary,
        // Include available shipping options
-       shippingOptions: getShippingOptions()
+       shippingOptions: getShippingOptions(),
+       appliedCoupon: cart.coupon 
+        ? { 
+            code: cart.coupon.code,
+            name: cart.coupon.name,
+            type: cart.coupon.type
+          } 
+        : null
+    
     }
   });
 });

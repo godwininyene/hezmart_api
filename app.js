@@ -7,6 +7,7 @@ const productRouter = require('./routes/productRoutes')
 const userRouter = require('./routes/userRoutes');
 const orderRouter = require('./routes/orderRoutes');
 const cartRouter = require('./routes/cartRoutes');
+const couponRouter = require('./routes/couponRoutes');
 const reviewRouter = require('./routes/reviewRoutes')
 const dashbaordRouter = require('./routes/dashboardRoutes')
 const AppError = require('./utils/appError');
@@ -54,6 +55,7 @@ app.use('/api/v1/products', productRouter);
 app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/orders', orderRouter);
 app.use('/api/v1/reviews', reviewRouter);
+app.use('/api/v1/coupons', couponRouter)
 app.use('/api/v1/dashboard', dashbaordRouter)
 
 app.all('*', (req, res, next)=>{

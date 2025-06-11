@@ -69,6 +69,9 @@ module.exports = {
         type: Sequelize.ENUM('pending', 'paid', 'failed', 'refunded'),
         defaultValue: 'pending'
       },
+      // Add these fields to your Order model
+      couponId: Sequelize.INTEGER,
+      couponCode: Sequelize.STRING,
       deliveryAddress: {
         type: Sequelize.TEXT,
         allowNull: false
