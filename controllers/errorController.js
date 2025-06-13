@@ -13,6 +13,8 @@ const handleSequelizeValidationError = err =>{
 }
 
 const handleSequelizeDuplicateError = err =>{
+  
+    
     const errors = err.errors.reduce((acc, el)=>{
         acc[el.path] = `${el.path} is already in use. Please use another value`
         return acc;
@@ -73,6 +75,15 @@ const sendErrorProd = (err, req, res)=>{
             err
         });
     }
+
+    const statusCode = err.statusCode || 500;
+    const status = err.status || 'error';
+
+    // Handle non-API routes (e.g., visiting root or bad paths)
+    return res.status(statusCode).send(`
+        <h1>${statusCode} - ${status}</h1>
+        <p>${err.message || 'Something went wrong'}</p>
+    `);
 }
 const sendErrorDev = (err, req, res)=>{
     // A) API
@@ -83,6 +94,16 @@ const sendErrorDev = (err, req, res)=>{
             error:err
         });
     }
+
+    
+    const statusCode = err.statusCode || 500;
+    const status = err.status || 'error';
+
+    // Handle non-API routes (e.g., visiting root or bad paths)
+    return res.status(statusCode).send(`
+        <h1>${statusCode} - ${status}</h1>
+        <p>${err.message || 'Something went wrong'}</p>
+    `);
 }
 
 

@@ -221,12 +221,6 @@ exports.mergeGuestCart = catchAsync(async (req, res, next) => {
     },
   });
 
-  // const [userCart] = await Cart.findOrCreate({
-  //   where: { userId },
-  //   defaults: { userId }
-  // });
-
-
     
   if (!guestCart) {
     return res.status(200).json({ status: "success", message: "No guest cart found to merge" });
