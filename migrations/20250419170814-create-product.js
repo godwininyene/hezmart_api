@@ -25,7 +25,8 @@ module.exports = {
       discountPrice: {
         type: Sequelize.DECIMAL(10, 2),
         comment: 'Must be less than price when set',
-        allowNull:true
+        allowNull:true,
+        defaultValue:null
       },
       weight: {
         type: Sequelize.DECIMAL(10, 2)

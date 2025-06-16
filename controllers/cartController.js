@@ -253,11 +253,6 @@ exports.clearCart = catchAsync(async (req, res, next) => {
 
     await CartItem.destroy({ where: { cartId: cart.id } });
   
-    // Remove all items from the cart
-    // for (const item of cart.items) {
-    //   await item.destroy();
-    // }
-  
     res.status(200).json({
       status: "success",
       message: "Cart cleared successfully",

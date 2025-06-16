@@ -62,7 +62,19 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: 'couponId',
         as: 'coupons'
       });
-      
+
+      Product.hasMany(models.Like, {
+        foreignKey: 'productId',
+        as: 'likes',
+        onDelete: 'CASCADE'// If product is deleted, delete its like
+      });
+
+      Product.belongsToMany(models.User, {
+        through: 'Likes',
+        as: 'likedByUsers',
+        foreignKey: 'productId',
+        otherKey: 'userId'
+      });
     }
   }
   Product.init({
@@ -210,6 +222,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue:1
     },
+    likesCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      validate: {
+        min: { args: [0], msg: 'Likes count cannot be negative' }
+    }
+  },
   }, {
     sequelize,
     modelName: 'Product',

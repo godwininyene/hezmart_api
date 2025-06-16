@@ -3,6 +3,7 @@ const authController = require('./../controllers/authController');
 const userController = require('./../controllers/userController');
 const { uploadBusinessLogo } = require('../utils/multerConfig');
 const {uploadUserPhoto } = require('../utils/multerConfig');
+const likeRouter = require('./likeRoutes'); 
 const router = express.Router();
 
 router.post(
@@ -30,6 +31,9 @@ router
 );
 
 router.patch('/:id/status',authController.protect, authController.restrictTo('admin'), userController.updateStatus)
+
+// Add likes nested route for users
+router.use('/likes', likeRouter);
 
 
 

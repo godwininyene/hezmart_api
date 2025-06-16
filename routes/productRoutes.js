@@ -2,10 +2,13 @@ const productController = require('./../controllers/productController');
 const authController = require('./../controllers/authController')
 const {uploadProductImages } = require('../utils/multerConfig');
 const reviewRouter = require('./reviewRoutes')
+const likeRouter = require('./likeRoutes')
 const express = require('express');
 
 const router = express.Router();
 router.use('/:productId/reviews', reviewRouter);
+router.use('/:productId/likes', likeRouter);
+
 
 router.route('/')
     .get(authController.maybeProtect, productController.getAllProducts)
