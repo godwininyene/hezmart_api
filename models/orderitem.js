@@ -36,10 +36,14 @@ module.exports = (sequelize, DataTypes) => {
         processing: ['shipped', 'cancelled'],
         shipped: ['delivered', 'cancelled'],
         delivered: ['received', 'returned'],
-        received: [],
-        cancelled: [],
-        returned: []
+        received: ['returned'], // Allow returns after receiving
+        cancelled: [], // Once cancelled, no further changes
+        returned: [] // Once returned, no further changes
       };
+      // Special case: admin should be able to cancel/return even after delivery/receipt
+      if (['cancelled', 'returned'].includes(newStatus)) {
+        return true;
+      }
       return validTransitions[this.fulfillmentStatus]?.includes(newStatus);
     }
     async updateStatus(newStatus, options = {}) {

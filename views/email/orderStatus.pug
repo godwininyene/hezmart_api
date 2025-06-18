@@ -1,0 +1,53 @@
+extends baseEmail
+
+block content
+  div.email-header
+    div.thanks-message
+      | ORDER #{status.toUpperCase()} NOTIFICATION
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+
+    p.instruction
+      | Your order ##{orderNumber} status has been updated to 
+      strong #{status.replace(/_/g, ' ').toUpperCase()}.
+
+    if items && items.length > 0
+      table(style="width:100%; border-collapse: collapse; margin: 20px 0;")
+        thead
+          tr
+            th(style="text-align:left; padding: 8px; background: #f2f2f2;") Product
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Qty
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Price
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Status
+        tbody
+          each item in items
+            tr
+              td(style="text-align:left; padding: 8px; border-bottom: 1px solid #ddd;")= item.name
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.quantity
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.price).toLocaleString()}`
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.status.toUpperCase()
+
+    //if status === 'shipped' && trackingNumber
+      div.shipping-info(style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;")
+        h3(style="margin-top: 0;") Shipping Information
+        p
+          strong Tracking Number: 
+          | #{trackingNumber}
+        if estimatedDelivery
+          p
+            strong Estimated Delivery: 
+            | #{estimatedDelivery}
+
+    p.validity-text
+      | You can view your order details in your 
+      a(href=`${url}/orders/${orderId}`, target="_blank") Order History
+      | .
+
+    p
+      | If you have any questions, please reply to this email.
+      br
+      br
+      | Best Regards,
+      br
+      strong Hezmart Team

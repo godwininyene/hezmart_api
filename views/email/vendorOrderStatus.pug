@@ -1,0 +1,49 @@
+extends baseEmail
+
+block content
+  div.email-header
+    div.thanks-message
+      | ORDER ITEM #{status.toUpperCase()} NOTIFICATION
+
+  main.email-body
+    h2.greeting Dear #{firstName},
+
+    p.instruction
+      | The status for order ##{orderNumber} has been updated to 
+      strong #{status.replace(/_/g, ' ').toUpperCase()}.
+
+    if items && items.length > 0
+      table(style="width:100%; border-collapse: collapse; margin: 20px 0;")
+        thead
+          tr
+            th(style="text-align:left; padding: 8px; background: #f2f2f2;") Product
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Qty
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Price
+            th(style="text-align:right; padding: 8px; background: #f2f2f2;") Status
+        tbody
+          each item in items
+            tr
+              td(style="text-align:left; padding: 8px; border-bottom: 1px solid #ddd;")= item.name
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.quantity
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.price).toLocaleString()}`
+              td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.status.toUpperCase()
+
+    if customerName
+      div.customer-info(style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;")
+        h3(style="margin-top: 0;") Customer Information
+        p
+          strong Name: 
+          | #{customerName}
+
+    p.validity-text
+      | View full order details in your 
+      a(href= `${url}/manage/vendor/orders/${orderId}`, target="_blank") Vendor Dashboard
+      | .
+
+    if status === 'shipped'
+      p.instruction Please ensure the customer receives their package as expected.
+
+    p
+      | Best Regards,
+      br
+      strong Hezmart Team

@@ -558,24 +558,38 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
 });
 
 
-
 // Update order item status
 exports.updateItemStatus = catchAsync(async (req, res, next) => {
   const { itemId } = req.params;
   const { status, notes } = req.body;
   const { id: userId, role } = req.user;
 
-
   // 1) Find the order item with necessary fields
   const item = await OrderItem.findOne({
     where: { id: itemId },
-    include: [{
-      model: Order,
-      as: 'order',
-      attributes: ['id', 'userId']
-    }]
+    include: [
+      {
+        model: Order,
+        as: 'order',
+        attributes: ['id', 'userId', 'orderNumber'],
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'email', 'role']
+        }]
+      },
+      {
+        model: User,
+        as: 'vendor',
+        attributes: ['id', 'firstName', 'email', 'role']
+      },
+      {
+        model: Product,
+        as: 'product',
+        attributes: ['id', 'name']
+      }
+    ]
   });
-  
 
   if (!item) {
     return next(new AppError('Order item not found', '', 404));
@@ -612,7 +626,60 @@ exports.updateItemStatus = catchAsync(async (req, res, next) => {
     // 4) Use the model's updateStatus method
     await item.updateStatus(status, updateData);
    
-    // 5) Return updated item
+    // 5) Send notifications if status is significant
+    if (['processing', 'shipped', 'delivered','received', 'cancelled', 'returned'].includes(status)) {
+      // Prepare common notification data
+      const notificationData = {
+        orderNumber: item.order.orderNumber,
+        orderId:item.order.id,
+        status,
+        items: [{
+          name: item.product.name,
+          quantity: item.quantity,
+          price:item.price || item.discountPrice,
+          status
+        }],
+        // trackingNumber: item.trackingNumber
+      };
+
+      // Send to customer if not initiated by customer
+      if (item.order.user && role !== 'customer') {
+        try {
+          const customerEmail = new Email(
+            item.order.user,
+            null,
+            process.env.FRONTEND_URL || 'https://hezmart.com',
+            status
+          );
+          await customerEmail.sendOrderStatusUpdate({
+            ...notificationData,
+            // estimatedDelivery: item.estimatedDelivery
+          });
+        } catch (emailError) {
+          console.error('Failed to send customer notification:', emailError);
+        }
+      }
+
+      // Send to vendor if not initiated by vendor
+      if (item.vendor && role !== 'vendor') {
+        try {
+          const vendorEmail = new Email(
+            item.vendor,
+            null,
+            process.env.FRONTEND_URL || 'https://hezmart.com',
+            status
+          );
+          await vendorEmail.sendVendorOrderStatusUpdate({
+            ...notificationData,
+            customerName: item.order.user?.firstName || 'Customer'
+          });
+        } catch (emailError) {
+          console.error('Failed to send vendor notification:', emailError);
+        }
+      }
+    }
+
+    // 6) Return updated item
     const updatedItem = await OrderItem.findByPk(itemId, {
       include: [
         { 
@@ -642,3 +709,89 @@ exports.updateItemStatus = catchAsync(async (req, res, next) => {
     throw error;
   }
 });
+
+
+
+//Currently working
+// exports.updateItemStatus = catchAsync(async (req, res, next) => {
+//   const { itemId } = req.params;
+//   const { status, notes } = req.body;
+//   const { id: userId, role } = req.user;
+
+
+//   // 1) Find the order item with necessary fields
+//   const item = await OrderItem.findOne({
+//     where: { id: itemId },
+//     include: [{
+//       model: Order,
+//       as: 'order',
+//       attributes: ['id', 'userId']
+//     }]
+//   });
+  
+
+//   if (!item) {
+//     return next(new AppError('Order item not found', '', 404));
+//   }
+
+//   // 2) Authorization check
+//   if (role === 'customer') {
+//     if (status !== 'received') {
+//       return next(new AppError('You can only mark items as received', '', 403));
+//     }
+//     if (item.order.userId !== userId) {
+//       return next(new AppError('Not authorized to update this item', '', 403));
+//     }
+//   } else if (role === 'vendor') {
+//     if (item.vendorId !== userId) {
+//       return next(new AppError('Not authorized to update this item', '', 403));
+//     }
+//     if (status === 'received') {
+//       return next(new AppError('Vendors cannot mark items as received', '', 403));
+//     }
+//   }
+
+//   // 3) Prepare update data
+//   const updateData = {};
+//   if (notes) {
+//     if (role === 'vendor') {
+//       updateData.vendorNotes = notes;
+//     } else if (role === 'customer') {
+//       updateData.customerNotes = notes;
+//     }
+//   }
+
+//   try {
+//     // 4) Use the model's updateStatus method
+//     await item.updateStatus(status, updateData);
+   
+//     // 5) Return updated item
+//     const updatedItem = await OrderItem.findByPk(itemId, {
+//       include: [
+//         { 
+//           model: Order, 
+//           as: 'order', 
+//           attributes: ['id', 'status', 'orderNumber'] 
+//         },
+//         { 
+//           model: Product, 
+//           as: 'product', 
+//           attributes: ['id', 'name'] 
+//         }
+//       ]
+//     });
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: {
+//         item: updatedItem,
+//         orderStatus: updatedItem.order.status 
+//       }
+//     });
+//   } catch (error) {
+//     if (error.message.includes('Invalid status transition')) {
+//       return next(new AppError(error.message, '', 400));
+//     }
+//     throw error;
+//   }
+// });
