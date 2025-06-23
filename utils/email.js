@@ -1,4 +1,3 @@
-
 const nodemailer = require('nodemailer');
 const pug = require('pug');
 
@@ -8,13 +7,15 @@ const SUBJECTS = {
   passwordReset: 'Your password reset token (valid for only 15 minutes)',
   emailVerification: 'Your email verification code (Valid for 15 minutes)',
   vendorOrderNotification: '🛍 New Order Received!',
+  customerOrderConfirmation: '✅ Order Confirmation – Order #{orderNumber}',
+  adminOrderNotification: '🚨 New Order Placed - Requires Admin Review',
   productStatus: {
     approved_product: '🎉 Congratulations! Your Product Listing is Approved',
     declined_product: '❗ Update: Your Product Listing Was Declined',
     suspended_product: '⚠️ Important: Your Product Listing Has Been Suspended',
     default: 'Your Hezmart Product Listing Status'
   },
-   orderStatus: {
+  orderStatus: {
     pending: '🔄 Your Order is Being Processed',
     processing: '🛠 Your Order is Being Prepared',
     shipped: '🚚 Your Order Has Shipped!',
@@ -57,7 +58,7 @@ module.exports = class Email {
     //     }
     //   });
     // }
-
+   
     if (process.env.NODE_ENV === 'production') {
       return nodemailer.createTransport({
         service: 'Gmail',
@@ -67,7 +68,7 @@ module.exports = class Email {
         }
       });
     }
-
+   
     // return nodemailer.createTransport({
     //   host: process.env.EMAIL_HOST,
     //   port: process.env.EMAIL_PORT,
@@ -93,7 +94,7 @@ module.exports = class Email {
       from: this.from,
       to: this.email,
       subject,
-      html
+      html,
     };
 
     await this.newTransport().sendMail(mailOptions);
@@ -106,13 +107,14 @@ module.exports = class Email {
       subject = templateData.subject;
     } else if (templateName === 'productStatus') {
       subject = SUBJECTS.productStatus[this.type] || SUBJECTS.productStatus.default;
+    } else if (templateName === 'orderConfirmation') {
+      subject = SUBJECTS.customerOrderConfirmation.replace('#{orderNumber}', templateData.orderNumber);
     } else {
       subject = SUBJECTS[templateName];
     }
 
     await this.renderAndSend(templateName, subject, templateData);
   }
-
 
   async sendOnBoard() {
     await this.sendTemplate('welcome');
@@ -137,27 +139,26 @@ module.exports = class Email {
   async sendOrderStatusUpdate(orderData) {
     await this.sendTemplate('orderStatus', {
       subject: SUBJECTS.orderStatus[this.type] || SUBJECTS.orderStatus.default,
-      orderNumber: orderData.orderNumber,
-      orderId:orderData.orderId,
-      status: this.type,
-      items: orderData.items,
-      // trackingNumber: orderData.trackingNumber,
-      // estimatedDelivery: orderData.estimatedDelivery
+      ...orderData
     });
   }
 
   async sendVendorOrderStatusUpdate(orderData) {
     await this.sendTemplate('vendorOrderStatus', {
       subject: SUBJECTS.vendorOrderStatus[this.type] || SUBJECTS.vendorOrderStatus.default,
-      orderNumber: orderData.orderNumber,
-      orderId:orderData.orderId,
-      status: this.type,
-      items: orderData.items,
-      customerName: orderData.customerName
+      ...orderData
     });
   }
 
   async sendVendorOrderNotification(templateData) {
-   await this.sendTemplate('vendorOrderNotification', templateData);
+    await this.sendTemplate('vendorOrderNotification', templateData);
+  }
+
+  async sendCustomerOrderConfirmation(orderData) {
+    await this.sendTemplate('customerOderNotification', orderData);
+  }
+
+  async sendAdminOrderNotification(orderData) {
+    await this.sendTemplate('adminOrderNotification', orderData);
   }
 };

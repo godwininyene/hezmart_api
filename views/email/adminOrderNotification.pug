@@ -1,0 +1,62 @@
+extends baseEmail
+
+block content
+  div.email-header(style="background-color: #4f46e5; padding: 20px; text-align: center; color: white;")
+    div.thanks-message(style="font-size: 24px; font-weight: bold;")
+      | 🚨 NEW ORDER PLACED - REQUIRES ADMIN REVIEW
+
+  main.email-body(style="padding: 20px;")
+    h2.greeting(style="color: #1f2937;") Admin Team,
+
+    p.alert-message(style="font-size: 16px; line-height: 1.5;")
+      | A new order (#{orderNumber}) has been placed on Hezmart that requires your attention.
+
+    div.order-summary(style="margin: 25px 0; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px;")
+      h3(style="margin-top: 0; color: #4f46e5;") Order Summary
+      table(style="width: 100%; border-collapse: collapse;")
+        tr
+          td(style="padding: 8px 0; width: 30%; font-weight: bold;") Order Number:
+          td ##{orderNumber}
+        tr
+          td(style="padding: 8px 0; font-weight: bold;") Order Date:
+          td= orderDate
+        tr
+          td(style="padding: 8px 0; font-weight: bold;") Customer:
+          td= customerName
+        tr
+          td(style="padding: 8px 0; font-weight: bold;") Payment Method:
+          td= paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)
+        tr
+          td(style="padding: 8px 0; font-weight: bold; vertical-align: top;") Order Total:
+          td(style="font-size: 18px; font-weight: bold; color: #10b981;")= `₦${parseFloat(orderTotal).toLocaleString()}`
+
+    div.order-items(style="margin: 25px 0;")
+      h3(style="margin-bottom: 15px; color: #4f46e5;") Order Items
+      table(style="width: 100%; border-collapse: collapse;")
+        thead
+          tr(style="background-color: #f3f4f6;")
+            th(style="text-align: left; padding: 12px;") Product
+            th(style="text-align: right; padding: 12px;") Vendor
+            th(style="text-align: right; padding: 12px;") Qty
+            th(style="text-align: right; padding: 12px;") Unit Price
+            th(style="text-align: right; padding: 12px;") Total
+        tbody
+          each item in items
+            tr(style="border-bottom: 1px solid #e5e7eb;")
+              td(style="padding: 12px; text-align: left;")= item.name
+              td(style="padding: 12px; text-align: right;")= item.vendor || 'Hezmart'
+              td(style="padding: 12px; text-align: right;")= item.quantity
+              td(style="padding: 12px; text-align: right;")= `₦${parseFloat(item.discountPrice || item.price).toLocaleString()}`
+              td(style="padding: 12px; text-align: right;")= `₦${parseFloat(item.total).toLocaleString()}`
+
+    div.action-buttons(style="margin: 30px 0; text-align: center;")
+      a(href=`${url}` style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;") REVIEW ORDER IN DASHBOARD
+
+    div.notes(style="margin-top: 25px; padding: 15px; background-color: #f3f4f6; border-radius: 8px;")
+      h4(style="margin-top: 0; color: #4f46e5;") Admin Notes:
+      p(style="margin-bottom: 0;") This is a system-generated notification for all new orders. Please review the order details in the admin dashboard.
+
+    p.signature(style="margin-top: 30px; color: #6b7280;")
+      | Hezmart Admin Team
+      br
+      | Automated Notification System

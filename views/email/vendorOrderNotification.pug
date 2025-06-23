@@ -21,13 +21,13 @@ block content
       tbody
         each item in items
           tr
-            td(style="text-align:left; padding: 8px; border-bottom: 1px solid #ddd;")= item.product.name
+            td(style="text-align:left; padding: 8px; border-bottom: 1px solid #ddd;")= item.name
             td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.quantity
-            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${item.product.discountPrice.toLocaleString() || item.product.price.toLocaleString()}`
-            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${item.total.toLocaleString()}`
+            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.discountPrice).toLocaleString() || parseFloat(item.price).toLocaleString()}`
+            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.total).toLocaleString()}`
         tr
           td(colspan="3" style="text-align:right; padding: 8px; font-weight: bold;") Order Total:
-          td(style="text-align:right; padding: 8px; font-weight: bold;")= `₦${orderTotal.toLocaleString()}`
+          td(style="text-align:right; padding: 8px; font-weight: bold;")= `₦${parseFloat(orderTotal).toLocaleString()}`
 
     p
       | Customer: #{customerName}

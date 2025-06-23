@@ -310,6 +310,7 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
     deliveryAddress,
     items: cart.items.map(item => ({
       productId: item.productId,
+      name: item.product.name,
       vendorId: item.product.userId,
       quantity: item.quantity,
       price: item.product.price,
@@ -320,9 +321,8 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       email: req.user.email,
       name: `${req.user.firstName} ${req.user.lastName}`,
       phone: req.user.primaryPhone || ''
-    }
+    },
   };
-
   // 5) Prepare Paystack payload with complete order data in metadata
   const payload = {
     email: req.user.email,
@@ -341,8 +341,8 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
     payload,
     {
       headers: {
-        // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
-        Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        // Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
         'Content-Type': 'application/json'
       }
     }
@@ -364,16 +364,19 @@ exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
     .update(JSON.stringify(req.body))
     .digest('hex');
 
+  //  const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+  //   .update(JSON.stringify(req.body))
+  //   .digest('hex');
+
   if (hash !== req.headers['x-paystack-signature']) {
     return res.status(401).send('Invalid signature');
   }
 
   const event = req.body;
-  
   // 2) Immediately respond to Paystack to acknowledge receipt
   res.status(200).json({ status: 'received' });
-
-  // 3) Process the webhook asynchronously
+  
+  // // 3) Process the webhook asynchronously
   if (event.event === 'charge.success') {
     try {
       await processSuccessfulPayment(event);
@@ -382,6 +385,7 @@ exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
       // Implement your error handling/retry logic here
     }
   }
+
 });
 
 // Async function to handle the actual order creation and processing
@@ -468,21 +472,115 @@ async function processSuccessfulPayment(event) {
       await new Email(
         vendor,
         null,
-        `${process.env.FRONTEND_URL}/vendor/orders`,
+        `${process.env.FRONTEND_URL}/manage/vendor/orders/${order.id}`,
         'new_order'
       ).sendVendorOrderNotification({
         subject: `🎉 New Order Received (${order.orderNumber})`,
         orderNumber: order.orderNumber,
         orderTotal: vendorOrderTotal,
         items: vendorItems,
-        customerName: orderData.customer.name
+        customerName: orderData.customer.name,
+        orderId:order.id
       });
     } catch (emailError) {
       console.error(`Failed to send email to vendor ${vendor.email}:`, emailError);
     }
   });
 
-  // 6) Create/update Paystack customer (if needed)
+
+  // 6) Send customer order confirmation
+  try {
+    const customer = await User.findByPk(orderData.userId, {
+      attributes: ['id', 'email', 'firstName']
+    });
+
+    if (customer) {
+      const customerItems = orderData.items.map(item => {
+        const unitPrice = item.discountPrice || item.price;
+        return {
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          discountPrice: item.discountPrice,
+          total: unitPrice * item.quantity
+        };
+      });
+      await new Email(
+        customer,
+        null,
+        `${process.env.FRONTEND_URL}/orders/${order.id}`,
+        'order_confirmation'
+      ).sendCustomerOrderConfirmation({
+        subject: `✅ Order Confirmation – Order #${order.orderNumber}`,
+        orderNumber: order.orderNumber,
+        orderDate: new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        paymentMethod: paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1),
+        shippingAddress: {
+          name: orderData.customer.name,
+          primaryPhone: orderData.deliveryAddress.primaryPhone,
+          primaryAddress: orderData.deliveryAddress.primaryAddress,
+          city: orderData.deliveryAddress.city,
+          country: orderData.deliveryAddress.country
+        },
+        items: customerItems,
+        orderTotal: order.total,
+        supportPhone: process.env.SUPPORT_PHONE || '+234 916 000 2490'
+      });
+    }
+  } catch (customerEmailError) {
+    console.error('Failed to send order confirmation to customer:', customerEmailError);
+  }
+
+  // 8) Send admin notification
+  try {
+    const admin = {
+      firstName: 'Hezmart Admin',
+      email: 'hezmartng@gmail.com'
+      //  email: 'admin@investmentcrestcapital.com'
+    };
+    const adminItems = orderData.items.map(item => {
+      const unitPrice = item.discountPrice || item.price;
+      const vendor = vendors.find(v => v.id === item.vendorId);
+      return {
+        name: item.name,
+        vendor: vendor?.firstName || 'Unknown Vendor',
+        quantity: item.quantity,
+        price: item.price,
+        discountPrice: item.discountPrice,
+        total: unitPrice * item.quantity
+      };
+    });
+
+    const adminEmailData = {
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      orderDate: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      paymentMethod: order.paymentMethod,
+      customerName: orderData.customer.name,
+      items: adminItems,
+      orderTotal: order.total,
+      // url: `${process.env.ADMIN_DASHBOARD_URL || process.env.FRONTEND_URL}/admin/orders/${order.id}`
+    };
+
+    await new Email(
+      admin,
+      null,
+      `${process.env.FRONTEND_URL}/manage/admin/orders/${order.id}`,
+      'new_order'
+    ).sendAdminOrderNotification(adminEmailData);
+  } catch (err) {
+    console.error(`Failed to send order notification to admin:`, err);
+  }
+
+  // 8) Create/update Paystack customer (if needed)
   try {
     await axios.post('https://api.paystack.co/customer', {
       email: orderData.customer.email,
