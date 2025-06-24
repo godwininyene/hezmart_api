@@ -10,6 +10,7 @@ const cartRouter = require('./routes/cartRoutes');
 const couponRouter = require('./routes/couponRoutes');
 const reviewRouter = require('./routes/reviewRoutes')
 const dashbaordRouter = require('./routes/dashboardRoutes')
+const searchRouter = require('./routes/searchRoutes')
 const AppError = require('./utils/appError');
 const cookieParser = require('cookie-parser')
 const path = require('path')
@@ -83,7 +84,8 @@ app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/orders', orderRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/coupons', couponRouter)
-app.use('/api/v1/dashboard', dashbaordRouter)
+app.use('/api/v1/dashboard', dashbaordRouter);
+app.use('/api/v1/search', searchRouter);
 
 app.all('*', (req, res, next)=>{
   next(new AppError(`The requested url ${req.originalUrl} was not found on this server!`, 'fail', 404))
