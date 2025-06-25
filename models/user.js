@@ -76,18 +76,18 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Primary phone number cannot be empty' }
       }
     },
-    secondaryPhone: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true,
-      validate: {
-        isValidPhone(value) {
-          if (value && !/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(value)) {
-            throw new Error('Please provide a valid phone number');
-          }
-        }
-      }
-    },
+    // secondaryPhone: {
+    //   type: DataTypes.STRING,
+    //   allowNull: true,
+    //   unique: true,
+    //   validate: {
+    //     isValidPhone(value) {
+    //       if (value && !/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(value)) {
+    //         throw new Error('Please provide a valid phone number');
+    //       }
+    //     }
+    //   }
+    // },
     primaryAddress: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -96,34 +96,34 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Primary address cannot be empty' }
       }
     },
-    secondaryAddress: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    country: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notNull: { msg: 'Please provide your country' },
-        notEmpty: { msg: 'Country cannot be empty' }
-      }
-    },
-    city: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notNull: { msg: 'Please provide your city' },
-        notEmpty: { msg: 'City cannot be empty' }
-      }
-    },
-    region: {
+    // secondaryAddress: {
+    //   type: DataTypes.STRING,
+    //   allowNull: true,
+    // },
+    // country: {
+    //   type: DataTypes.STRING,
+    //   allowNull: false,
+    //   validate: {
+    //     notNull: { msg: 'Please provide your country' },
+    //     notEmpty: { msg: 'Country cannot be empty' }
+    //   }
+    // },
+    state: {
       type: DataTypes.STRING,
       allowNull: false,
       validate: {
-        notNull: { msg: 'Please provide your region' },
-        notEmpty: { msg: 'Region cannot be empty' }
+        notNull: { msg: 'Please provide your state' },
+        notEmpty: { msg: 'State cannot be empty' }
       }
     },
+    // region: {
+    //   type: DataTypes.STRING,
+    //   allowNull: false,
+    //   validate: {
+    //     notNull: { msg: 'Please provide your region' },
+    //     notEmpty: { msg: 'Region cannot be empty' }
+    //   }
+    // },
     photo:{
       type:DataTypes.STRING,
       defaultValue:`${process.env.APP_URL}/uploads/users/default.jpg`

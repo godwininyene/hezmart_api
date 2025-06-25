@@ -27,28 +27,28 @@ module.exports = {
         allowNull: false,
         unique:true,
       },
-      secondaryPhone: {
-        type: Sequelize.STRING,
-        allowNull: true,
-        unique:true,
-      },
+      // secondaryPhone: {
+      //   type: Sequelize.STRING,
+      //   allowNull: true,
+      //   unique:true,
+      // },
       primaryAddress: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      secondaryAddress: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
-      country: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
-      city: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
-      region: {
+      // secondaryAddress: {
+      //   type: Sequelize.STRING,
+      //   allowNull: true,
+      // },
+      // country: {
+      //   type: Sequelize.STRING,
+      //   allowNull: false,
+      // },
+      // region: {
+      //   type: Sequelize.STRING,
+      //   allowNull: false,
+      // },
+      state: {
         type: Sequelize.STRING,
         allowNull: false,
       },

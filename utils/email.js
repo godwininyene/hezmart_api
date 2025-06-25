@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const pug = require('pug');
+const { convert } = require('html-to-text');
 
 const SUBJECTS = {
   welcome: 'Welcome to the family',
@@ -45,30 +46,19 @@ module.exports = class Email {
   }
 
   newTransport() {
-    // if (process.env.NODE_ENV === 'production') {
-    //   return nodemailer.createTransport({
-    //     host: process.env.EMAIL_HOST,
-    //     // port: process.env.EMAIL_PORT,
-    //     // secure: true,
-    //      port: 465,              
-    //      secure: false,          // false means STARTTLS will be us
-    //     auth: {
-    //       user: process.env.EMAIL_USER,
-    //       pass: process.env.EMAIL_PASSWORD
-    //     }
-    //   });
-    // }
-   
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production') { 
       return nodemailer.createTransport({
-        service: 'Gmail',
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        secure: true,                                
         auth: {
-          user: process.env.GMAIL_USERNAME,
-          pass: process.env.GMAIL_PASS
-        }
+          user:  process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD,
+        },
       });
     }
    
+    
     // return nodemailer.createTransport({
     //   host: process.env.EMAIL_HOST,
     //   port: process.env.EMAIL_PORT,
@@ -95,6 +85,13 @@ module.exports = class Email {
       to: this.email,
       subject,
       html,
+      text: convert(html, {
+        wordwrap: 130,       // Better formatting for plain text
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } }, // Cleaner links
+          { selector: 'img', format: 'skip' }               // Skip images in text
+        ]
+      })
     };
 
     await this.newTransport().sendMail(mailOptions);
