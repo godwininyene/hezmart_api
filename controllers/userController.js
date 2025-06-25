@@ -159,11 +159,8 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         'lastName', 
         'email', 
         'primaryPhone', 
-        'secondaryPhone', 
-        'country',
-        'city', 
+        'state', 
         'primaryAddress', 
-        'secondaryAddress',
         'photo'
     ];
     
