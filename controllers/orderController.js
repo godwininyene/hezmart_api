@@ -862,6 +862,10 @@ exports.confirmPayment = catchAsync(async(req, res, next)=>{
       null
     );
     await  customerEmail.sendPaymentConfirmation(notificationData)
+
+    await order.update({ 
+      paymentStatus: 'paid',
+    });
   }catch(err){
     console.error('Failed to send customer notification:', err);
     return next(err)
