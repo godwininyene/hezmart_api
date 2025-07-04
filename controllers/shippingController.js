@@ -41,7 +41,7 @@ exports.updateSettings = catchAsync(async (req, res, next) => {
     // Create first settings
     settings = await ShippingSetting.create({
       ...req.body,
-      updatedBy: req.user.id,
+      // updatedBy: req.user.id,
       isActive: true
     });
   }
