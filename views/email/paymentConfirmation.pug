@@ -1,0 +1,46 @@
+extends baseEmail
+
+block content
+  div.email-header(style="background-color: #4f46e5;  text-align: center; color: white;")
+    div.thanks-message(style="font-size: 24px; font-weight: bold; margin-bottom: 10px;")
+      | PAYMENT CONFIRMED!
+
+    div.verify-message(style="font-size: 14px; padding: 30px")
+      | Your payment for order ##{orderNumber} has been successfully processed.
+
+  main.email-body(style="padding: 20px;")
+    h2.greeting(style="color: #333;") Dear #{firstName},
+
+    p.instruction(style="line-height: 1.6;")
+      | We're pleased to inform you that we've received your payment of 
+      strong ₦#{parseFloat(amount).toLocaleString()}
+      | for your order ##{orderNumber}. Your order is now being processed.
+
+    div.payment-details(style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;")
+      h3(style="margin-top: 0;") Payment Details
+      p(style="margin-bottom: 5px;")
+        strong Payment Method:
+        |  #{paymentMethod}
+      p(style="margin-bottom: 5px;")
+        strong Transaction Date:
+        |  #{transactionDate}
+     
+    p.tracking-info(style="line-height: 1.6;")
+      | You can track your order status anytime by 
+      a(href=`${url}/orders/${orderId}` style="color: #4CAF50; text-decoration: none;") visiting your order page
+      | .
+
+    p.support-text(style="line-height: 1.6; margin-top: 20px;")
+      | If you have any questions about your payment, please reply to this email or contact our support team:
+
+    ul(style="padding-left: 20px; margin-top: 5px; margin-bottom: 20px;")
+      li(style="margin-bottom: 8px;")
+        | 📧 
+        a(href="mailto:support@hezmart.com" style="color: #3B82F6; text-decoration: none;") support@hezmart.com
+      li
+        | 📞 #{supportPhone}
+
+    p(style="margin-top: 30px;")
+      | Thank you for shopping with us!
+      br
+      strong The Hezmart Team

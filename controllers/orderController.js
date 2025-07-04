@@ -1,5 +1,5 @@
 const catchAsync = require("../utils/catchAsync");
-const { Cart, CartItem, Product, Order, OrderItem, sequelize, User, Review, Coupon } = require('../models');
+const { Cart, CartItem, Product, Order, OrderItem, PickupLocation, PaymentOption, ShippingStateFee, User, Review, Coupon } = require('../models');
 const AppError = require("../utils/appError");
 const axios = require('axios');
 const Sequelize = require('sequelize');
@@ -7,41 +7,9 @@ const generatePaginationMeta = require('../utils/pagination');
 const APIFeatures = require("../utils/apiFeatures");
 const Email = require('./../utils/email')
 const crypto = require('crypto');
+const { prepareOrderData, processOrderCreation ,sendOrderNotifications } = require('../utils/orderHelpers');
 
-// Helper function to calculate cart totals
-const calculateCartTotals = (items) => {
-  return items.reduce((acc, item) => {
-    const price = parseFloat(item.product.price);
-    const discountPrice = item.product.discountPrice 
-      ? parseFloat(item.product.discountPrice) 
-      : null;
-    
-    acc.totalItems += item.quantity;
-    acc.subtotal += item.quantity * price;
-    
-    if (discountPrice) {
-      acc.discount += item.quantity * (price - discountPrice);
-    
-      
-    }
 
-    if (item.product.stockQuantity < item.quantity) {
-      acc.unavailableItems.push({
-        productId: item.product.id,
-        name: item.product.name,
-        requested: item.quantity,
-        available: item.product.stockQuantity
-      });
-    }
-
-    return acc;
-  }, {
-    totalItems: 0,
-    subtotal: 0,
-    discount: 0, // This will be combined with coupon discount
-    unavailableItems: []
-  });
-};
 // Get all orders for current user
 exports.getUserOrders = catchAsync(async (req, res, next) => {
   const { role, id: userId } = req.user;
@@ -239,154 +207,351 @@ exports.cancelOrder = catchAsync(async (req, res, next) => {
 });
 
 // Get CheckoutSession Controller - Only prepares payment
-exports.getCheckoutSession = catchAsync(async (req, res, next) => {  
-  const userId = req.user.id;
-  const { deliveryAddress, paymentMethod = 'card', shippingOptionId } = req.body;
-
-  // 1) Get cart and validate
-  const cart = await Cart.findOne({
-    where: { userId },
-    include: [
-      {
-        model: CartItem,
-        as: 'items',
-        include: [{
-          model: Product,
-          as: 'product',
-          attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity', 'userId']
-        }]
-      },
-      {
-        model: Coupon,
-        as: 'coupon',
-        attributes: ['id', 'code', 'type']
-      }
-    ]
-  });
-
-  if (!cart || !cart.items || cart.items.length === 0) {
-    return next(new AppError('Your cart is empty', '', 400));
-  }
-
-  // 2) Calculate totals and validate stock
-  const calculations = calculateCartTotals(cart.items);
-  const couponDiscount = cart.discountAmount || 0;
-  calculations.discount += parseFloat(couponDiscount);
-
-  if (calculations.unavailableItems.length > 0) {
-    return next(new AppError(
-      'Some items in your cart are not available in the requested quantities',
-      { unavailableItems: calculations.unavailableItems },
-      400
-    ));
-  }
-
-  // 3) Calculate shipping and total
-  const shippingOptions = {
-    standard: 1500,
-    express: 3000,
-    pickup: 0
-  };
-  //Will use this when shipping fees has been finalize
-  // const deliveryFee = shippingOptions[shippingOptionId] || 1500;
-  // const total = calculations.subtotal - calculations.discount + deliveryFee;
-
+exports.getCheckoutSession = catchAsync(async (req, res, next) => {
+  try{
+    const { orderData, cart } = await prepareOrderData(req, req.body);
   
-  const total = calculations.subtotal - calculations.discount
-  
-  const orderNumber = await Order.generateOrderNumber();
-
-  // 4) Prepare all order data to be stored in Paystack metadata
-  const orderData = {
-    userId,
-    orderNumber,
-    subtotal: calculations.subtotal,
-    discount: calculations.discount,
-    couponId: cart.couponId,
-    couponCode: cart.coupon?.code,
-    // deliveryFee,
-    total,
-    paymentMethod,
-    deliveryAddress,
-    items: cart.items.map(item => ({
-      productId: item.productId,
-      name: item.product.name,
-      vendorId: item.product.userId,
-      quantity: item.quantity,
-      price: item.product.price,
-      discountPrice: item.product.discountPrice,
-      selectedOptions: item.selectedOptions || {}
-    })),
-    customer: {
-      email: req.user.email,
-      name: `${req.user.firstName} ${req.user.lastName}`,
-      phone: req.user.primaryPhone || ''
-    },
-  };
-  // 5) Prepare Paystack payload with complete order data in metadata
-  const payload = {
-    email: req.user.email,
-    amount: total * 100,
-    reference: orderNumber,
-    callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
-    metadata: {
-      orderData: JSON.stringify(orderData), // Store all order data here
-      cartId: cart.id
-    }
-  };
-
-  // 6) Call Paystack API
-  const response = await axios.post(
-    'https://api.paystack.co/transaction/initialize',
-    payload,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        // Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
-        'Content-Type': 'application/json'
+    // Prepare Paystack payload
+    const payload = {
+      email: orderData.customer.email,
+      amount: orderData.total * 100,
+      reference: orderData.orderNumber,
+      callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
+      metadata: {
+        orderData: JSON.stringify(orderData),
+        cartId: cart.id
       }
-    }
-  );
+    };
 
-  res.status(200).json({
-    status: "success",
-    data: {
-      checkoutUrl: response.data.data.authorization_url,
-      reference: orderNumber
-    }
-  });
+    // Call Paystack API
+    const response = await axios.post(
+      'https://api.paystack.co/transaction/initialize',
+      payload,
+      {
+        headers: {
+          // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        checkoutUrl: response.data.data.authorization_url,
+        reference: orderData.orderNumber
+      }
+    });
+  }catch(error){
+     console.log(error);
+    return next(error);
+  }
 });
+
+//The below is currently working
+// exports.getCheckoutSession = catchAsync(async (req, res, next) => {  
+//   const userId = req.user.id;
+//   const { 
+//     deliveryAddress, 
+//     paymentMethod = 'card', 
+//     deliveryOption,
+//     selectedStateId,//This is the selected state fee ID
+//     pickupStationId, // This is the selected station ID
+//     cryptoWalletId, //This is the selected crypto wallet id
+//   } = req.body;
+
+//   // 1) Get cart and validate
+//   const cart = await Cart.findOne({
+//     where: { userId },
+//     include: [
+//       {
+//         model: CartItem,
+//         as: 'items',
+//         include: [{
+//           model: Product,
+//           as: 'product',
+//           attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity', 'userId']
+//         }]
+//       },
+//       {
+//         model: Coupon,
+//         as: 'coupon',
+//         attributes: ['id', 'code', 'type']
+//       }
+//     ]
+//   });
+
+//   if (!cart || !cart.items || cart.items.length === 0) {
+//     return next(new AppError('Your cart is empty', '', 400));
+//   }
+
+//   // 2) Calculate delivery fee based on delivery option
+//   let deliveryFee = 0;
+//   let stateFee = 0;
+//   let pickupStationDetails = null;
+//   let walletDetails = null;
+//   let stateFeeData = null
+
+//   if(deliveryOption === 'door' && !selectedStateId){
+//     return next(new AppError('Missing field (selectedStateId) for door delivery', '', 400))
+//   }
+
+//   if(deliveryOption === 'pickup' && !pickupStationId){
+//     return next(new AppError('Missing field (pickupStationId) for pickup delivery', '', 400))
+//   }
+
+//   if(paymentMethod === 'crypto' && !cryptoWalletId){
+//     return next(new AppError('Missing field (cryptoWalletId) for crypto payment method', '', 400))
+//   }
+
+//   if (deliveryOption === 'door') {
+//     // Fetch state fee from database
+//     stateFeeData = await ShippingStateFee.findByPk(selectedStateId,{
+//       attributes: ['fee', 'state']
+//     });
+   
+    
+//     if (!stateFeeData) {
+//       return next(new AppError(`Delivery not available for selected state`,'', 400));
+//     }
+    
+//     stateFee = parseFloat(stateFeeData.fee);
+//     deliveryFee = stateFee;
+//   } 
+//   else if (deliveryOption === 'pickup') {
+//     // Fetch pickup station details
+//     const station = await PickupLocation.findByPk(pickupStationId, {
+//       attributes: ['name','fee', 'state', 'address', 'contactPhone']
+//     });
+//     if (!station) {
+//       return next(new AppError('Selected pickup station not found', '', 400));
+//     }
+    
+//     pickupStationDetails = {
+//       name: station.name,
+//       state:station.state,
+//       address: station.address,
+//       fee: station.fee,
+//       contactPhone:station.contactPhone
+//     };
+//     deliveryFee = parseFloat(station.fee);
+//   }
+
+//   if(paymentMethod === 'crypto'){
+//     const wallet = await PaymentOption.findByPk(cryptoWalletId,{
+//       attributes:['networkName', 'walletAddress', 'barcode']
+//     })
+//     if(!wallet){
+//       return next(new AppError('Selected wallet not found', '', 400));
+//     }
+//     walletDetails = {
+//       name:wallet.networkName,
+//       address:wallet.walletAddress,
+//       barcode:wallet.barcode
+//     }
+//   }
+
+//   // 3) Calculate cart totals
+//   const calculations = calculateCartTotals(cart.items);
+//   const couponDiscount = cart.discountAmount || 0;
+//   calculations.discount += parseFloat(couponDiscount);
+
+//   if (calculations.unavailableItems.length > 0) {
+//     return next(new AppError(
+//       'Some items in your cart are not available in the requested quantities',
+//       { unavailableItems: calculations.unavailableItems },
+//       400
+//     ));
+//   }
+
+//   // 4) Calculate final total
+//   const total = calculations.subtotal - calculations.discount + deliveryFee;
+//   const orderNumber = await Order.generateOrderNumber();
+
+//   // 5) Prepare order data
+//   const orderData = {
+//     userId,
+//     orderNumber,
+//     subtotal: calculations.subtotal,
+//     discount: calculations.discount,
+//     couponId: cart.couponId,
+//     couponCode: cart.coupon?.code,
+//     deliveryFee,
+//     total,
+//     paymentMethod,
+//     deliveryOption,
+//     deliveryAddress,
+//     state: deliveryOption === 'door' ? stateFeeData.state : null,
+//     stateFee: deliveryOption === 'door' ? stateFee : null,
+//     pickupStationDetails: deliveryOption === 'pickup' ? pickupStationDetails : null,
+//     walletDetails:paymentMethod ==='crypto' ?walletDetails :null,
+//     items: cart.items.map(item => ({
+//       productId: item.productId,
+//       name: item.product.name,
+//       vendorId: item.product.userId,
+//       quantity: item.quantity,
+//       price: item.product.price,
+//       discountPrice: item.product.discountPrice,
+//       selectedOptions: item.selectedOptions || {}
+//     })),
+//     customer: {
+//       email: req.user.email,
+//       name: `${req.user.firstName} ${req.user.lastName}`,
+//       phone: req.user.primaryPhone || ''
+//     },
+//   };
+
+//   // 6) Prepare Paystack payload
+//   const payload = {
+//     email: req.user.email,
+//     amount: total * 100,
+//     reference: orderNumber,
+//     callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
+//     metadata: {
+//       orderData: JSON.stringify(orderData),
+//       cartId: cart.id
+//     }
+//   };
+
+//   // 7) Call Paystack API
+//   const response = await axios.post(
+//     'https://api.paystack.co/transaction/initialize',
+//     payload,
+//     {
+//       headers: {
+//         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+//         'Content-Type': 'application/json'
+//       }
+//     }
+//   );
+
+//   res.status(200).json({
+//     status: "success",
+//     data: {
+//       checkoutUrl: response.data.data.authorization_url,
+//       reference: orderNumber
+//     }
+//   });
+// });
 
 // Handle Paystack webhook - Creates and processes the order
 exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
-  // 1) Verify signature first
-  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
-
-  //  const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+  // Verify signature
+  // const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
   //   .update(JSON.stringify(req.body))
   //   .digest('hex');
+
+   const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+    .update(JSON.stringify(req.body))
+    .digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
     return res.status(401).send('Invalid signature');
   }
 
   const event = req.body;
-  // 2) Immediately respond to Paystack to acknowledge receipt
   res.status(200).json({ status: 'received' });
   
-  // // 3) Process the webhook asynchronously
   if (event.event === 'charge.success') {
     try {
-      await processSuccessfulPayment(event);
+      const metadata = event.data.metadata;
+      const orderData = JSON.parse(metadata.orderData);
+      const paymentMethod = event.data.channel || 'card';
+      
+      // Create and process the order
+      const order = await processOrderCreation(orderData, { status: 'paid' });
+      
+      // Clear the cart
+      await Cart.destroy({ where: { id: metadata.cartId } });
+      
+      // Send notifications
+      await sendOrderNotifications(order, orderData);
+
+      // Create/update Paystack customer
+      try {
+        await axios.post('https://api.paystack.co/customer', {
+          email: orderData.customer.email,
+          first_name: orderData.customer.name.split(' ')[0],
+          last_name: orderData.customer.name.split(' ')[1] || '',
+          phone: orderData.customer.phone || ''
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (err) {
+        console.error('Failed to create Paystack customer:', err.response?.data || err.message);
+      }
     } catch (error) {
       console.error('Error processing payment webhook:', error);
-      // Implement your error handling/retry logic here
     }
   }
-
 });
+
+
+//Handle crypto payment checkout
+exports.createCryptoOrder = catchAsync(async (req, res, next) => {
+  try{
+    const { orderData, cart } = await prepareOrderData(req, req.body);   
+    // Create order with pending payment status
+    orderData.paymentMethod = 'crypto';
+    const order = await processOrderCreation(orderData, { status: 'pending' });
+    
+    // Clear the cart
+    await Cart.destroy({ where: { id: cart.id } });
+    
+    // Send notifications
+    await sendOrderNotifications(order, orderData);
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        order,
+        paymentDetails: {
+          method: 'crypto',
+          walletDetails: orderData.walletDetails,
+          amount: orderData.total
+        }
+      }
+    });
+  }catch(error){
+    console.log(error);
+    return next(error);
+  }
+});
+
+//Below is currently working
+// exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
+//   // 1) Verify signature first
+//   const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+//     .update(JSON.stringify(req.body))
+//     .digest('hex');
+
+//   //  const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+//   //   .update(JSON.stringify(req.body))
+//   //   .digest('hex');
+
+//   if (hash !== req.headers['x-paystack-signature']) {
+//     return res.status(401).send('Invalid signature');
+//   }
+
+//   const event = req.body;
+//   // 2) Immediately respond to Paystack to acknowledge receipt
+//   res.status(200).json({ status: 'received' });
+  
+//   // // 3) Process the webhook asynchronously
+//   if (event.event === 'charge.success') {
+//     try {
+//       await processSuccessfulPayment(event);
+//     } catch (error) {
+//       console.error('Error processing payment webhook:', error);
+//       // Implement your error handling/retry logic here
+//     }
+//   }
+
+// });
 
 // Async function to handle the actual order creation and processing
 async function processSuccessfulPayment(event) {
@@ -655,6 +820,62 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
   });
 });
 
+//Confirm payment
+exports.confirmPayment = catchAsync(async(req, res, next)=>{
+  const { id } = req.params;
+  //1) Find the order with necessary field
+  const order = await Order.findByPk(id, {
+    include:[{model: User, as: 'user', attributes:['id', 'firstName', 'email']}]
+  });
+  
+  if (!order) {
+    return next(new AppError('Order not found', '', 404));
+  }
+
+  // Format the transaction date
+  const formatTransactionDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Prepare  notification data
+  const notificationData = {
+    orderNumber: order.orderNumber,
+    amount:order.total,
+    paymentMethod: order.paymentMethod,
+    transactionDate: formatTransactionDate(order.createdAt),
+    orderId:order.id,
+    supportPhone: process.env.SUPPORT_PHONE || '+234 916 000 2490'
+  };
+
+  try{
+    const customerEmail = new Email(
+      order.user,
+      null,
+      process.env.FRONTEND_URL || 'https://hezmart.com',
+      null
+    );
+    await  customerEmail.sendPaymentConfirmation(notificationData)
+  }catch(err){
+    console.error('Failed to send customer notification:', err);
+    return next(err)
+  }
+  
+ 
+
+  res.status(200).json({
+    status:'success',
+    data:{
+      order
+    }
+  })
+})
 
 // Update order item status
 exports.updateItemStatus = catchAsync(async (req, res, next) => {
@@ -737,7 +958,6 @@ exports.updateItemStatus = catchAsync(async (req, res, next) => {
           price:item.price || item.discountPrice,
           status
         }],
-        // trackingNumber: item.trackingNumber
       };
 
       // Send to customer if not initiated by customer
@@ -807,89 +1027,3 @@ exports.updateItemStatus = catchAsync(async (req, res, next) => {
     throw error;
   }
 });
-
-
-
-//Currently working
-// exports.updateItemStatus = catchAsync(async (req, res, next) => {
-//   const { itemId } = req.params;
-//   const { status, notes } = req.body;
-//   const { id: userId, role } = req.user;
-
-
-//   // 1) Find the order item with necessary fields
-//   const item = await OrderItem.findOne({
-//     where: { id: itemId },
-//     include: [{
-//       model: Order,
-//       as: 'order',
-//       attributes: ['id', 'userId']
-//     }]
-//   });
-  
-
-//   if (!item) {
-//     return next(new AppError('Order item not found', '', 404));
-//   }
-
-//   // 2) Authorization check
-//   if (role === 'customer') {
-//     if (status !== 'received') {
-//       return next(new AppError('You can only mark items as received', '', 403));
-//     }
-//     if (item.order.userId !== userId) {
-//       return next(new AppError('Not authorized to update this item', '', 403));
-//     }
-//   } else if (role === 'vendor') {
-//     if (item.vendorId !== userId) {
-//       return next(new AppError('Not authorized to update this item', '', 403));
-//     }
-//     if (status === 'received') {
-//       return next(new AppError('Vendors cannot mark items as received', '', 403));
-//     }
-//   }
-
-//   // 3) Prepare update data
-//   const updateData = {};
-//   if (notes) {
-//     if (role === 'vendor') {
-//       updateData.vendorNotes = notes;
-//     } else if (role === 'customer') {
-//       updateData.customerNotes = notes;
-//     }
-//   }
-
-//   try {
-//     // 4) Use the model's updateStatus method
-//     await item.updateStatus(status, updateData);
-   
-//     // 5) Return updated item
-//     const updatedItem = await OrderItem.findByPk(itemId, {
-//       include: [
-//         { 
-//           model: Order, 
-//           as: 'order', 
-//           attributes: ['id', 'status', 'orderNumber'] 
-//         },
-//         { 
-//           model: Product, 
-//           as: 'product', 
-//           attributes: ['id', 'name'] 
-//         }
-//       ]
-//     });
-
-//     res.status(200).json({
-//       status: 'success',
-//       data: {
-//         item: updatedItem,
-//         orderStatus: updatedItem.order.status 
-//       }
-//     });
-//   } catch (error) {
-//     if (error.message.includes('Invalid status transition')) {
-//       return next(new AppError(error.message, '', 400));
-//     }
-//     throw error;
-//   }
-// });

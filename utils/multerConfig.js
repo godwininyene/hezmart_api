@@ -17,6 +17,8 @@ const storage = multer.diskStorage({
             cb(null, 'public/uploads/categoryIcons')
         }else if(file.fieldname === 'photo'){
             cb(null, 'public/uploads/users')
+        }else if(file.fieldname === 'walletBarcode'){
+            cb(null, 'public/uploads/walletBarcodes')
         }
     },
     filename: (req, file, cb) => {
@@ -57,6 +59,6 @@ exports.uploadProductImages = upload.fields([
     {name:'coverImage', maxCount: 1},
     {name: 'images', maxCount: 3}
 ]);
-
+exports.uploadWalletBarcode=upload.single('walletBarcode')
 exports.uploadCategoryIcon = upload.single('catIcon');
 exports.uploadUserPhoto = upload.single('photo');

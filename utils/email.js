@@ -10,6 +10,7 @@ const SUBJECTS = {
   vendorOrderNotification: '🛍 New Order Received!',
   customerOrderConfirmation: '✅ Order Confirmation – Order #{orderNumber}',
   adminOrderNotification: '🚨 New Order Placed - Requires Admin Review',
+  paymentConfirmation: '💰 Payment Confirmed – Order #{orderNumber}',
   productStatus: {
     approved_product: '🎉 Congratulations! Your Product Listing is Approved',
     declined_product: '❗ Update: Your Product Listing Was Declined',
@@ -106,7 +107,9 @@ module.exports = class Email {
       subject = SUBJECTS.productStatus[this.type] || SUBJECTS.productStatus.default;
     } else if (templateName === 'orderConfirmation') {
       subject = SUBJECTS.customerOrderConfirmation.replace('#{orderNumber}', templateData.orderNumber);
-    } else {
+    }else if (templateName === 'paymentConfirmation') {
+      subject = SUBJECTS.paymentConfirmation.replace('#{orderNumber}', templateData.orderNumber)
+    }else {
       subject = SUBJECTS[templateName];
     }
 
@@ -157,5 +160,8 @@ module.exports = class Email {
 
   async sendAdminOrderNotification(orderData) {
     await this.sendTemplate('adminOrderNotification', orderData);
+  }
+  async sendPaymentConfirmation(orderData){
+    await this.sendTemplate('paymentConfirmation', orderData);
   }
 };

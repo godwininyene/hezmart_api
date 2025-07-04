@@ -39,7 +39,6 @@ exports.getAllUsers = catchAsync(async(req, res, next)=>{
 });
 
 exports.getUser = catchAsync(async(req, res, next)=>{
-    console.log(req.user);
     
     const user = await User.findByPk(req.params.id)
     if(!user){
@@ -167,7 +166,9 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     const filteredBody = filterObj(req.body, ...allowedFields);
     
     // Handle file upload if present
-    if (req.file) filteredBody.photo = req.file.filename;
+    if (req.file) {
+       filteredBody.photo = `${host}/uploads/users/${req.file.filename}`;
+    }
 
     // 3) Update user document 
     const user = await User.findByPk(req.user.id);

@@ -1,3 +1,4 @@
+//Order model;
 'use strict';
 const {
   Model
@@ -22,7 +23,7 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     static async generateOrderNumber() {
-      const prefix = 'HE';
+      const prefix = 'ORD';
       const timestamp = Date.now();
       const random = Math.floor(Math.random() * 1000);
       return `${prefix}-${timestamp}-${random}`;
@@ -171,12 +172,12 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     paymentMethod: {
-      type: DataTypes.ENUM('card', 'bank_transfer', 'wallet', 'cash_on_delivery', 'crypto'),
+      type: DataTypes.ENUM('card', 'bank_transfer', 'wallet', 'cash_on_delivery'),
       allowNull: false,
       validate: {
         notNull: { msg: 'Payment method is required' },
         isIn: {
-          args: [['card', 'bank_transfer', 'wallet', 'cash_on_delivery', 'crypto']],
+          args: [['card', 'bank_transfer', 'wallet', 'cash_on_delivery']],
           msg: 'Invalid payment method'
         }
       }
@@ -190,76 +191,6 @@ module.exports = (sequelize, DataTypes) => {
           msg: 'Invalid payment status'
         }
       }
-    },
-    deliveryOption: {
-      type: DataTypes.ENUM('door', 'pickup'),
-      allowNull: false,
-      validate: {
-        notNull: { msg: 'Delivery option is required and the values are pickup or door' }
-      }
-    },
-    stateFeeDetails: {
-      type: DataTypes.TEXT,
-      allowNull: true, // Only required for pickup
-      get() {
-        const rawValue = this.getDataValue('stateFeeDetails');
-        try {
-          return JSON.parse(rawValue);
-        } catch (e) {
-          return null;
-        }
-      },
-      set(value) {
-        if(value){
-          if (typeof value === 'object' && value !== null) {
-            this.setDataValue('stateFeeDetails', JSON.stringify(value));
-          } else {
-            throw new Error('State fee Details address must be an object');
-          }
-        }
-      },
-    },
-    pickupStationDetails: {
-      type: DataTypes.TEXT,
-      allowNull: true, // Only required for pickup
-      get() {
-        const rawValue = this.getDataValue('pickupStationDetails');
-        try {
-          return JSON.parse(rawValue);
-        } catch (e) {
-          return null;
-        }
-      },
-      set(value) {
-        if(value){
-          if (typeof value === 'object' && value !== null) {
-            this.setDataValue('pickupStationDetails', JSON.stringify(value));
-          } else {
-            throw new Error('Pickup station Details address must be an object');
-          }
-        }
-      },
-    },
-    walletDetails: {
-      type: DataTypes.TEXT,
-      allowNull: true, // Only required for crypto payment method
-       get() {
-        const rawValue = this.getDataValue('walletDetails');
-        try {
-          return JSON.parse(rawValue);
-        } catch (e) {
-          return null;
-        }
-      },
-      set(value) {
-        if(value){
-          if (typeof value === 'object' && value !== null) {
-            this.setDataValue('walletDetails', JSON.stringify(value));
-          } else {
-            throw new Error('wallet Details address must be an object');
-          }
-        }
-      },
     },
     couponId: DataTypes.INTEGER,
     couponCode: DataTypes.STRING,
@@ -292,13 +223,12 @@ module.exports = (sequelize, DataTypes) => {
           }
           if (
             !addressObj.primaryAddress ||
-            !addressObj.state ||
+            !addressObj.city ||
+            !addressObj.country ||
             !addressObj.primaryPhone ||
-            !addressObj.firstName ||
-            !addressObj.lastName || 
-            !addressObj.email
+            !addressObj.firstName
           ) {
-            throw new Error('Delivery address must include primary address, firstname, lastname, state, email, and primary phone');
+            throw new Error('Delivery address must include primary address, name, city, primary phone, and country');
           }
         }
       }
@@ -335,3 +265,123 @@ module.exports = (sequelize, DataTypes) => {
   });
   return Order;
 };
+
+// Get CheckoutSession Controller - Only prepares payment
+exports.getCheckoutSession = catchAsync(async (req, res, next) => {  
+  const userId = req.user.id;
+  const { deliveryAddress, paymentMethod = 'card', shippingOptionId } = req.body;
+
+  // 1) Get cart and validate
+  const cart = await Cart.findOne({
+    where: { userId },
+    include: [
+      {
+        model: CartItem,
+        as: 'items',
+        include: [{
+          model: Product,
+          as: 'product',
+          attributes: ['id', 'name', 'price', 'discountPrice', 'stockQuantity', 'userId']
+        }]
+      },
+      {
+        model: Coupon,
+        as: 'coupon',
+        attributes: ['id', 'code', 'type']
+      }
+    ]
+  });
+
+  if (!cart || !cart.items || cart.items.length === 0) {
+    return next(new AppError('Your cart is empty', '', 400));
+  }
+
+  // 2) Calculate totals and validate stock
+  const calculations = calculateCartTotals(cart.items);
+  const couponDiscount = cart.discountAmount || 0;
+  calculations.discount += parseFloat(couponDiscount);
+
+  if (calculations.unavailableItems.length > 0) {
+    return next(new AppError(
+      'Some items in your cart are not available in the requested quantities',
+      { unavailableItems: calculations.unavailableItems },
+      400
+    ));
+  }
+
+  // 3) Calculate shipping and total
+  const shippingOptions = {
+    standard: 1500,
+    express: 3000,
+    pickup: 0
+  };
+  //Will use this when shipping fees has been finalize
+  // const deliveryFee = shippingOptions[shippingOptionId] || 1500;
+  // const total = calculations.subtotal - calculations.discount + deliveryFee;
+
+  
+  const total = calculations.subtotal - calculations.discount
+  
+  const orderNumber = await Order.generateOrderNumber();
+
+  // 4) Prepare all order data to be stored in Paystack metadata
+  const orderData = {
+    userId,
+    orderNumber,
+    subtotal: calculations.subtotal,
+    discount: calculations.discount,
+    couponId: cart.couponId,
+    couponCode: cart.coupon?.code,
+    // deliveryFee,
+    total,
+    paymentMethod,
+    deliveryAddress,
+    items: cart.items.map(item => ({
+      productId: item.productId,
+      name: item.product.name,
+      vendorId: item.product.userId,
+      quantity: item.quantity,
+      price: item.product.price,
+      discountPrice: item.product.discountPrice,
+      selectedOptions: item.selectedOptions || {}
+    })),
+    customer: {
+      email: req.user.email,
+      name: `${req.user.firstName} ${req.user.lastName}`,
+      phone: req.user.primaryPhone || ''
+    },
+  };
+  // 5) Prepare Paystack payload with complete order data in metadata
+  const payload = {
+    email: req.user.email,
+    amount: total * 100,
+    reference: orderNumber,
+    callback_url: req.body.redirect_url || `${process.env.FRONTEND_URL}/orders`,
+    metadata: {
+      orderData: JSON.stringify(orderData), // Store all order data here
+      cartId: cart.id
+    }
+  };
+
+  // 6) Call Paystack API
+  const response = await axios.post(
+    'https://api.paystack.co/transaction/initialize',
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        // Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      checkoutUrl: response.data.data.authorization_url,
+      reference: orderNumber
+    }
+  });
+});
+
