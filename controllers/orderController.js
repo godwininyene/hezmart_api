@@ -229,9 +229,9 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       payload,
       {
         headers: {
-          // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-          Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          // Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+          // 'Content-Type': 'application/json'
         }
       }
     );
@@ -438,13 +438,13 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
 // Handle Paystack webhook - Creates and processes the order
 exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
   // Verify signature
-  // const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-  //   .update(JSON.stringify(req.body))
-  //   .digest('hex');
-
-   const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
     .update(JSON.stringify(req.body))
     .digest('hex');
+
+  //  const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+  //   .update(JSON.stringify(req.body))
+  //   .digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
     return res.status(401).send('Invalid signature');
@@ -458,7 +458,7 @@ exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
       const metadata = event.data.metadata;
       const orderData = JSON.parse(metadata.orderData);
       const paymentMethod = event.data.channel || 'card';
-      
+      orderData.paymentMethod = paymentMethod;
       // Create and process the order
       const order = await processOrderCreation(orderData, { status: 'paid' });
       
