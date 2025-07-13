@@ -1,0 +1,41 @@
+extends baseEmail
+
+block content
+  div.email-header
+    div.thanks-message STAY CONNECTED WITH HEZMART
+    div.verify-message Thanks for Subscribing!
+
+  main.email-body
+    h2.greeting Dear #{name || 'Valued Subscriber'},
+
+    p.instruction
+      | Welcome to the Hezmart community! We're thrilled to have you on board. Here's what you can look forward to:
+
+    ul.benefits-list
+      li 🔥 Exclusive early access to sales and promotions
+      li 🚀 First looks at new product arrivals
+      li 💰 Subscriber-only discounts and special offers
+      li 📢 Important store news and updates
+      li 🎁 Occasional surprises just for our email family
+
+    p.instruction
+      | We respect your inbox and promise to only send you valuable content that's worth your time.
+
+    if showPreferences
+      p.preference-text
+        | You can always 
+        a(href=`${preferenceLink}`) update your preferences 
+        | or 
+        a(href=`${unsubscribeLink}`) unsubscribe 
+        | if our emails aren't right for you.
+
+    div.signature
+      p
+        | Happy shopping!
+        br
+        strong The Hezmart Team
+
+    div.footer-note
+      p.small-text
+        br
+        | © #{new Date().getFullYear()} Hezmart. All rights reserved.

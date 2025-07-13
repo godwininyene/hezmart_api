@@ -4,6 +4,7 @@ const { convert } = require('html-to-text');
 
 const SUBJECTS = {
   welcome: 'Welcome to the family',
+  welcomeSubscriber: '🎉 Welcome to Hezmart, {name}!',
   status: 'Your Hezmart user account status',
   passwordReset: 'Your password reset token (valid for only 15 minutes)',
   emailVerification: 'Your email verification code (Valid for 15 minutes)',
@@ -118,6 +119,10 @@ module.exports = class Email {
 
   async sendOnBoard() {
     await this.sendTemplate('welcome');
+  }
+  async sendSubscriber(name){
+    const subject = SUBJECTS.welcomeSubscriber.replace('{name}', name);
+    await this.sendTemplate('welcomeSubscriber', { subject, name });
   }
 
   async sendStatus() {
