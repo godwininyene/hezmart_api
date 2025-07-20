@@ -118,6 +118,12 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true
       },
+      //FOr social auth
+      authProvider: {
+        type: Sequelize.ENUM('local', 'google', 'apple'),
+        defaultValue: 'local'
+      },
+    
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE

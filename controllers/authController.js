@@ -5,7 +5,11 @@ const Email = require('../utils/email');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const {promisify} = require('util')
+const {promisify} = require('util');
+const { verifyAppleToken } = require('../utils/appleAuth');
+const { verifyGoogleToken } = require('../utils/googleAuth');
+
+
 
 const signToken = user =>{
   return jwt.sign({id:user.id}, process.env.JWT_SECRET, {
@@ -37,6 +41,88 @@ const createSendToken = (user, req, res, statusCode)=>{
     }
   })
 }
+
+
+exports.googleAuth = catchAsync(async (req, res, next) => {
+  const { token } = req.body;
+  
+  if (!token) {
+    return next(new AppError('Google authentication failed - no token provided', '', 400));
+  }
+
+  try {
+    // Verify the Google token using the helper function
+    const payload = await verifyGoogleToken(token); 
+    const email = payload.email;
+
+    // Check if user exists
+    let user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      // Create new user if doesn't exist
+      user = new User({
+        email,
+        firstName: payload.given_name || '',
+        lastName: payload.family_name || '',
+        role:'customer',
+        status:'active',
+        photo:payload.picture,
+        isEmailVerified: true,
+        authProvider: 'google'
+      })
+      await user.save({validate:false})
+    } else if (user.authProvider !== 'google') {
+      return next(new AppError('This email is already registered with another method', '', 400));
+    }
+
+    createSendToken(user, req, res, 200);
+  } catch (error) { 
+    return next(new AppError('Google authentication failed: ' + error.message, '', 401));
+  }
+});
+
+// exports.appleAuth = catchAsync(async (req, res, next) => {
+//   const { token, user: appleUser } = req.body;
+  
+//   if (!token) {
+//     return next(new AppError('Apple authentication failed - no token provided', '', 400));
+//   }
+
+//   try {
+//     // Verify Apple token (implementation depends on your verification method)
+//     const appleClaims = await verifyAppleToken(token); // You'll need to implement this
+    
+//     // Apple may not return email in subsequent logins
+//     const email = appleClaims.email || appleUser?.email;
+    
+//     if (!email) {
+//       return next(new AppError('Email not provided by Apple', '', 400));
+//     }
+
+//     // Check if user exists
+//     let user = await User.findOne({ where: { email } });
+
+//     if (!user) {
+//       // Create new user if doesn't exist
+//       user = new User({
+//         email,
+//         firstName: appleUser?.name?.firstName || '',
+//         lastName: appleUser?.name?.lastName || '',
+//         isEmailVerified: true, // Apple already verified the email
+//         authProvider: 'apple'
+//       });
+//       await user.save({validate:false})
+//     } else if (user.authProvider !== 'apple') {
+//       // User exists but didn't sign up with Apple
+//       return next(new AppError('This email is already registered with another method', '', 400));
+//     }
+
+//     // Log the user in
+//     createSendToken(user, req, res, 200);
+//   } catch (error) {
+//     return next(new AppError('Apple authentication failed', '', 401));
+//   }
+// });
 
 exports.signup = catchAsync(async(req, res, next) => {
   
@@ -298,7 +384,7 @@ exports.forgotPassword = catchAsync(async(req, res, next)=>{
   }catch(err){
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
-    await user.save({validateBeforeSave:false});
+    await user.save({validate:false});
     return next(new AppError("There was a problem sending email. Please try again later!",'', 500))
   }
 });

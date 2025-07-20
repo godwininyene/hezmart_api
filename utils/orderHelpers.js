@@ -156,6 +156,13 @@ exports.prepareOrderData = async (req, body) => {
     );
   }
 
+   if (parseFloat(calculations.subtotal - calculations.discount) <= 8000 ) {
+    throw new AppError(
+      'Orders with a total under ₦8,000 will not be shipped','',400
+    );
+  }
+  
+
   // Calculate final total
   const total = calculations.subtotal - calculations.discount + deliveryFee;
   const orderNumber = await Order.generateOrderNumber();

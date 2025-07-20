@@ -167,9 +167,9 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     
     // Handle file upload if present
     if (req.file) {
-       filteredBody.photo = `${host}/uploads/users/${req.file.filename}`;
+       filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.file.filename}`;
     }
-
+    
     // 3) Update user document 
     const user = await User.findByPk(req.user.id);
     if (!user) {

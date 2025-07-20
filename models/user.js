@@ -254,7 +254,15 @@ module.exports = (sequelize, DataTypes) => {
           }
         }
       }
-    }
+    },
+    // //For social auth
+    authProvider: {
+      type: DataTypes.ENUM('local', 'google', 'apple'),
+      defaultValue: 'local'
+    },
+    // providerId: {
+    //   type: DataTypes.STRING
+    // }
   }, {
     sequelize,
     modelName: 'User',
