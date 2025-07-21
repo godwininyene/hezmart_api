@@ -1,4 +1,4 @@
-const { Order, OrderItem, Product, Cart, User, CartItem, Coupon, ShippingStateFee, PickupLocation,PaymentOption } = require('../models');
+const { Order, OrderItem, Product, Cart, User, CartItem, Coupon, ShippingStateFee, ShippingSetting, PickupLocation,PaymentOption } = require('../models');
 const Email = require('./email');
 const AppError = require('./appError');
 
@@ -156,12 +156,15 @@ exports.prepareOrderData = async (req, body) => {
     );
   }
 
-   if (parseFloat(calculations.subtotal - calculations.discount) <= 8000 ) {
-    throw new AppError(
-      'Orders with a total under ₦8,000 will not be shipped','',400
-    );
+  const shippingSetting = await ShippingSetting.findOne({where: { isActive: true },});
+  const {minShippingEnabled, shippingMinAmount} = shippingSetting;
+
+  const orderTotal = parseFloat(calculations.subtotal - calculations.discount);
+
+  if (minShippingEnabled && orderTotal < shippingMinAmount) {
+    
+    throw new AppError(`Orders with a total under ₦${shippingMinAmount.toLocaleString()} will not be shipped`, '', 400);
   }
-  
 
   // Calculate final total
   const total = calculations.subtotal - calculations.discount + deliveryFee;

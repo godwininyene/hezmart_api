@@ -9,19 +9,19 @@ module.exports = {
       },
       doorDeliveryEnabled:{ 
         type: Sequelize.BOOLEAN,
-        defaultValue: true
+        defaultValue: false
       },
       pickupEnabled:{
         type: Sequelize.BOOLEAN,
-        defaultValue: true
-      },
-      freeShippingEnabled:{
-        type: Sequelize.BOOLEAN,
         defaultValue: false
       },
-      freeShippingMinAmount:{
+      minShippingEnabled:{
+        type: Sequelize.BOOLEAN,
+        defaultValue: true
+      },
+      shippingMinAmount:{
         type: Sequelize.INTEGER,
-        defaultValue: 10000
+        defaultValue: 8000
       },
       isActive:{ type:
         Sequelize.BOOLEAN,

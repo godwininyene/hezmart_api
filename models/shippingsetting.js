@@ -4,10 +4,6 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class ShippingSetting extends Model {
     static associate(models) {
-      // ShippingSetting.belongsTo(models.User, {
-      //   foreignKey: 'updatedBy',
-      //   as: 'updatedByUser'
-      // });
     }
 
     static async getActiveSettings() {
@@ -20,19 +16,19 @@ module.exports = (sequelize, DataTypes) => {
   ShippingSetting.init({
     doorDeliveryEnabled: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: false
     },
     pickupEnabled: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
-    },
-    freeShippingEnabled: {
-      type: DataTypes.BOOLEAN,
       defaultValue: false
     },
-    freeShippingMinAmount: {
+    minShippingEnabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+    },
+    shippingMinAmount: {
       type: DataTypes.INTEGER,
-      defaultValue: 10000
+      defaultValue: 8000
     },
     isActive: {
       type: DataTypes.BOOLEAN,

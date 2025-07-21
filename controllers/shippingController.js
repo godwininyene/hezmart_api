@@ -18,7 +18,7 @@ exports.getActiveSettings = catchAsync(async (req, res, next) => {
   });
 });
 
-// Create or update shipping settings
+// Update shipping settings (only one active record exists at a time)
 exports.updateSettings = catchAsync(async (req, res, next) => {
   // Find existing active settings
   const currentSettings = await ShippingSetting.findOne({
@@ -28,20 +28,17 @@ exports.updateSettings = catchAsync(async (req, res, next) => {
   let settings;
   
   if (currentSettings) {
-    // Deactivate current settings
-    await currentSettings.update({ isActive: false });
-    
-    // Create new settings
-    settings = await ShippingSetting.create({
+    // Update existing settings
+    settings = await currentSettings.update({
       ...req.body,
       updatedBy: req.user.id,
       isActive: true
     });
   } else {
-    // Create first settings
+    // Create first settings if none exist
     settings = await ShippingSetting.create({
       ...req.body,
-      // updatedBy: req.user.id,
+      updatedBy: req.user.id,
       isActive: true
     });
   }
