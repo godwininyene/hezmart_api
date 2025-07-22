@@ -229,8 +229,8 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
       payload,
       {
         headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-          // Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
+          // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`,
           // 'Content-Type': 'application/json'
         }
       }
@@ -438,13 +438,13 @@ exports.getCheckoutSession = catchAsync(async (req, res, next) => {
 // Handle Paystack webhook - Creates and processes the order
 exports.handlePaystackWebhook = catchAsync(async (req, res, next) => {
   // Verify signature
-  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
-
-  //  const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+  // const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
   //   .update(JSON.stringify(req.body))
   //   .digest('hex');
+
+   const hash = crypto.createHmac('sha512', 'sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36')
+    .update(JSON.stringify(req.body))
+    .digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
     return res.status(401).send('Invalid signature');
@@ -771,54 +771,98 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
     `https://api.paystack.co/transaction/verify/${reference}`,
     {
       headers: {
-        
-        // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
-         Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`
+         // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+        Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`
       }
     }
   );
 
   const paymentData = response.data.data;
 
-  // Find and update order
+  // Find order
   const order = await Order.findOne({ where: { orderNumber: reference } });
   if (!order) {
-    return next(new AppError('Order not found','', 404));
+    return next(new AppError('Order not found', '', 404));
   }
 
-  if (paymentData.status) {
-    await order.update({
-      paymentStatus: 'paid',
-      status: 'processing'
+  // Only proceed if payment status is 'success'
+  if (paymentData.status === 'success') {
+    // await order.update({
+    //   paymentStatus: 'paid',
+    //   status: 'processing'
+    // });
+
+    // // Clear cart
+    // await Cart.destroy({ where: { userId: order.userId } });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Payment verified successfully'
     });
-
-    // Clear cart
-    await Cart.destroy({ where: { userId: order.userId } });
   }
-  //Get user's orders 
-  const orders = await Order.findAll({
-    where: { userId: req.user.id },
-    include: [{
-      model: OrderItem,
-      as: 'items',
-      include: [{
-        model: Product,
-        as: 'product',
-        attributes: ['id', 'name', 'coverImage']
-      }]
-    }],
-    order: [['createdAt', 'DESC']]
-  });
 
-  res.status(200).json({
-    status: 'success',
-    data: {
-      orders,
-      paymentStatus: paymentData.status,
-      orderStatus: order.status
-    }
+  // If payment wasn't successful
+  return res.status(400).json({
+    status: 'fail',
+    message: 'Payment not successful',
+    paymentStatus: paymentData.status
   });
 });
+// exports.verifyPayment = catchAsync(async (req, res, next) => {
+//   const { reference } = req.params;
+
+//   const response = await axios.get(
+//     `https://api.paystack.co/transaction/verify/${reference}`,
+//     {
+//       headers: {
+        
+//         // Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+//          Authorization: `Bearer sk_test_e0753309f4e282a44c1b076b5d0c5c252ced1f36`
+//       }
+//     }
+//   );
+
+//   const paymentData = response.data.data;
+
+//   // Find and update order
+//   const order = await Order.findOne({ where: { orderNumber: reference } });
+//   if (!order) {
+//     return next(new AppError('Order not found','', 404));
+//   }
+
+//   if (paymentData.status) {
+//     await order.update({
+//       paymentStatus: 'paid',
+//       status: 'processing'
+//     });
+
+//     // Clear cart
+//     await Cart.destroy({ where: { userId: order.userId } });
+//   }
+//   //Get user's orders 
+//   // const orders = await Order.findAll({
+//   //   where: { userId: req.user.id },
+//   //   include: [{
+//   //     model: OrderItem,
+//   //     as: 'items',
+//   //     include: [{
+//   //       model: Product,
+//   //       as: 'product',
+//   //       attributes: ['id', 'name', 'coverImage']
+//   //     }]
+//   //   }],
+//   //   order: [['createdAt', 'DESC']]
+//   // });
+
+//   res.status(200).json({
+//     status: 'success',
+//     // data: {
+//     //   orders,
+//     //   paymentStatus: paymentData.status,
+//     //   orderStatus: order.status
+//     // }
+//   });
+// });
 
 //Confirm payment
 exports.confirmPayment = catchAsync(async(req, res, next)=>{
