@@ -9,7 +9,10 @@ const cleanExpiredGuestCarts = async () => {
         userId: null,
         expiresAt: { [Op.lt]: new Date() }
       },
-      include: [CartItem]
+      include: [{
+        model: CartItem,
+        as: 'items'
+      }]
     });
 
     for (const cart of expiredCarts) {

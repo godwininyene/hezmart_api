@@ -202,3 +202,17 @@ exports.getMe = (req, res, next)=>{
     req.params.id = req.user.id;
     next();
 }
+
+exports.deleteMe = catchAsync(async(req, res, next)=>{
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+        return next(new AppError('User not found', '', 404));
+    }
+
+    await user.update({active:false});
+
+    res.status(204).json({
+        status:'success',
+        data:null
+    })
+})

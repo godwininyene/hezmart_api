@@ -76,18 +76,6 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Primary phone number cannot be empty' }
       }
     },
-    // secondaryPhone: {
-    //   type: DataTypes.STRING,
-    //   allowNull: true,
-    //   unique: true,
-    //   validate: {
-    //     isValidPhone(value) {
-    //       if (value && !/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(value)) {
-    //         throw new Error('Please provide a valid phone number');
-    //       }
-    //     }
-    //   }
-    // },
     primaryAddress: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -96,18 +84,6 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'Primary address cannot be empty' }
       }
     },
-    // secondaryAddress: {
-    //   type: DataTypes.STRING,
-    //   allowNull: true,
-    // },
-    // country: {
-    //   type: DataTypes.STRING,
-    //   allowNull: false,
-    //   validate: {
-    //     notNull: { msg: 'Please provide your country' },
-    //     notEmpty: { msg: 'Country cannot be empty' }
-    //   }
-    // },
     state: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -116,14 +92,6 @@ module.exports = (sequelize, DataTypes) => {
         notEmpty: { msg: 'State cannot be empty' }
       }
     },
-    // region: {
-    //   type: DataTypes.STRING,
-    //   allowNull: false,
-    //   validate: {
-    //     notNull: { msg: 'Please provide your region' },
-    //     notEmpty: { msg: 'Region cannot be empty' }
-    //   }
-    // },
     photo:{
       type:DataTypes.STRING,
       defaultValue:`${process.env.APP_URL}/uploads/users/default.jpg`
@@ -186,6 +154,10 @@ module.exports = (sequelize, DataTypes) => {
           msg: 'Invalid user status'
         }
       }
+    },
+    active:{
+      type:DataTypes.BOOLEAN,
+      defaultValue:true
     },
     emailVerificationCode: {
       type: DataTypes.STRING,
@@ -298,9 +270,10 @@ module.exports = (sequelize, DataTypes) => {
         });
       }
     },
-    // Exclude password by default in queries
+    // Exclude the following fields by default in queries
     defaultScope: {
-      attributes: { exclude: ['password'] }
+      where: { active: true },
+      attributes: { exclude: ['password', 'active'] }
     },
     // Custom scopes (e.g.,To include password in specific queries)
     scopes: {

@@ -27,27 +27,12 @@ module.exports = {
         allowNull: false,
         unique:true,
       },
-      // secondaryPhone: {
-      //   type: Sequelize.STRING,
-      //   allowNull: true,
-      //   unique:true,
-      // },
+     
       primaryAddress: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      // secondaryAddress: {
-      //   type: Sequelize.STRING,
-      //   allowNull: true,
-      // },
-      // country: {
-      //   type: Sequelize.STRING,
-      //   allowNull: false,
-      // },
-      // region: {
-      //   type: Sequelize.STRING,
-      //   allowNull: false,
-      // },
+     
       state: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -81,6 +66,10 @@ module.exports = {
         type: Sequelize.ENUM('active', 'pending', 'denied', 'deactivated'),
         allowNull: false,
         defaultValue: 'active'
+      },
+      active:{
+        type:Sequelize.BOOLEAN,
+        defaultValue:true
       },
       emailVerificationCode: {
         type: Sequelize.STRING,

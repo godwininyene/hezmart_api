@@ -255,8 +255,9 @@ exports.login = catchAsync(async(req, res, next)=>{
     {credentials:"Please provide email and password "}, 401))
   }
 
-  //2) Check if user exist and password is correct
-  const user = await User.scope('withPassword').findOne({
+ 
+   //2) Check if user exist,  password is correct, and active check
+  const user = await User.scope(['withPassword', 'defaultScope']).findOne({
     where: { email }
   });
 
