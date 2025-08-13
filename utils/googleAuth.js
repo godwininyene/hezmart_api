@@ -15,6 +15,7 @@ async function verifyGoogleToken(token) {
     });
     return ticket.getPayload();
   } catch (error) {
+    // throw new Error(error)
     throw new Error('Invalid Google token');
   }
 }

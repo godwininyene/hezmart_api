@@ -65,15 +65,19 @@ module.exports = (sequelize, DataTypes) => {
     },
     primaryPhone: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       unique:true,
       validate: {
         is: {
           args: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im,
           msg: 'Please provide a valid phone number'
         },
-        notNull: { msg: 'Please provide primary phone number' },
-        notEmpty: { msg: 'Primary phone number cannot be empty' }
+        notEmpty: { msg: 'Primary phone number cannot be empty' },
+        localAuthRequired(value) {
+          if (this.authProvider === 'local' && !value) {
+            throw new Error('Please provide primary phone number');
+          }
+        }
       }
     },
     primaryAddress: {

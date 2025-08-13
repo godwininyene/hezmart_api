@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const {promisify} = require('util');
 const { verifyAppleToken } = require('../utils/appleAuth');
 const { verifyGoogleToken } = require('../utils/googleAuth');
+const { validate } = require('node-cron');
 
 
 
@@ -60,7 +61,7 @@ exports.googleAuth = catchAsync(async (req, res, next) => {
 
     if (!user) {
       // Create new user if doesn't exist
-      user = new User({
+      user = await  User.create({
         email,
         firstName: payload.given_name || '',
         lastName: payload.family_name || '',
@@ -69,15 +70,16 @@ exports.googleAuth = catchAsync(async (req, res, next) => {
         photo:payload.picture,
         isEmailVerified: true,
         authProvider: 'google'
-      })
-      await user.save({validate:false})
+      }, {validate:false})
+      // await user.save({validate:false})
     } else if (user.authProvider !== 'google') {
       return next(new AppError('This email is already registered with another method', '', 400));
     }
 
     createSendToken(user, req, res, 200);
   } catch (error) { 
-    return next(new AppError('Google authentication failed: ' + error.message, '', 401));
+    return next(new AppError('Google authentication failed: ' + error.message, 401));
+    // return next(new AppError('Google authentication failed: ' + error.message, error, 401));
   }
 });
 
