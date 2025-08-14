@@ -31,8 +31,7 @@ router.patch('/updateMe', uploadUserPhoto, userController.updateMe);
 router.delete('/deleteMe', userController.deleteMe);
 
 // Admin restricted routes
-router.use(authController.restrictTo('admin'));
-router.patch('/:id/status', userController.updateStatus);
+router.patch('/:id/status', authController.restrictTo('admin'), userController.updateStatus);
 
 // Add likes nested route for users
 router.use('/likes', likeRouter);
