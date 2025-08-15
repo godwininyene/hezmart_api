@@ -20,7 +20,7 @@ router.route('/resend_verification').post(authController.resendVerificationEmail
 
 //Non protected routes;sss
 router.get('/', userController.getAllUsers);
-router.get('/:id', userController.getUser);
+
 
 // Protected routes (require authentication)
 router.use(authController.protect);
@@ -29,6 +29,7 @@ router.patch('/updateMyPassword', authController.updatePassword);
 router.get('/me', userController.getMe, userController.getUser);
 router.patch('/updateMe', uploadUserPhoto, userController.updateMe);
 router.delete('/deleteMe', userController.deleteMe);
+router.get('/:id', userController.getUser);
 
 // Admin restricted routes
 router.patch('/:id/status', authController.restrictTo('admin'), userController.updateStatus);
