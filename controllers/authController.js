@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const {promisify} = require('util');
 const { verifyAppleToken } = require('../utils/appleAuth');
 const { verifyGoogleToken } = require('../utils/googleAuth');
-const { validate } = require('node-cron');
+
 
 
 
@@ -71,60 +71,16 @@ exports.googleAuth = catchAsync(async (req, res, next) => {
         isEmailVerified: true,
         authProvider: 'google'
       }, {validate:false})
-      // await user.save({validate:false})
     } else if (user.authProvider !== 'google') {
       return next(new AppError('This email is already registered with another method', '', 400));
     }
-
+  // Send welcome email
+    await new Email(user, user.role, '').sendOnBoard();
     createSendToken(user, req, res, 200);
   } catch (error) { 
     return next(new AppError('Google authentication failed: ' + error.message, 401));
-    // return next(new AppError('Google authentication failed: ' + error.message, error, 401));
   }
 });
-
-// exports.appleAuth = catchAsync(async (req, res, next) => {
-//   const { token, user: appleUser } = req.body;
-  
-//   if (!token) {
-//     return next(new AppError('Apple authentication failed - no token provided', '', 400));
-//   }
-
-//   try {
-//     // Verify Apple token (implementation depends on your verification method)
-//     const appleClaims = await verifyAppleToken(token); // You'll need to implement this
-    
-//     // Apple may not return email in subsequent logins
-//     const email = appleClaims.email || appleUser?.email;
-    
-//     if (!email) {
-//       return next(new AppError('Email not provided by Apple', '', 400));
-//     }
-
-//     // Check if user exists
-//     let user = await User.findOne({ where: { email } });
-
-//     if (!user) {
-//       // Create new user if doesn't exist
-//       user = new User({
-//         email,
-//         firstName: appleUser?.name?.firstName || '',
-//         lastName: appleUser?.name?.lastName || '',
-//         isEmailVerified: true, // Apple already verified the email
-//         authProvider: 'apple'
-//       });
-//       await user.save({validate:false})
-//     } else if (user.authProvider !== 'apple') {
-//       // User exists but didn't sign up with Apple
-//       return next(new AppError('This email is already registered with another method', '', 400));
-//     }
-
-//     // Log the user in
-//     createSendToken(user, req, res, 200);
-//   } catch (error) {
-//     return next(new AppError('Apple authentication failed', '', 401));
-//   }
-// });
 
 exports.signup = catchAsync(async(req, res, next) => {
   
@@ -375,7 +331,7 @@ exports.forgotPassword = catchAsync(async(req, res, next)=>{
   //3) Generate random reset token
   const resetToken = user.createPasswordResetToken();
   await user.save({validateBeforeSave:false});
-  const resetURL = `${req.get('referer')}resetPassword?token=${resetToken}`
+  const resetURL = `${process.env.FRONTEND_URL}resetPassword?token=${resetToken}`
  
   //4) Send token to client's email
   try{

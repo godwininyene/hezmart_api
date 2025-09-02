@@ -42,6 +42,29 @@ exports.getSubcategory = catchAsync(async(req, res, next)=>{
     });
 });
 
+// Update category
+exports.updateSubCategory = catchAsync(async (req, res, next) => {
+  // Update the subcategory
+  const [affectedRows] = await SubCategory.update(req.body, {
+    where: { id: req.params.id }
+  });
+
+  // Check if any rows were affected
+  if (affectedRows === 0) {
+    return next(new AppError('No subcategory was found with that ID','', 404));
+  }
+
+  // Fetch the updated subcategory
+  const updatedSubCategory = await SubCategory.findByPk(req.params.id);
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      subcategory: updatedSubCategory
+    }
+  });
+});
+
 exports.deleteSubCategory = catchAsync(async(req, res, next)=>{
     const deletedCount = await SubCategory.destroy({
         where: { id: req.params.id }
