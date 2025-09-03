@@ -160,14 +160,25 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         'primaryPhone', 
         'state', 
         'primaryAddress', 
-        'photo'
+        'photo',
+        'businessName',
+        'businessCategoryId',
+        'businessLogo'
     ];
     
     const filteredBody = filterObj(req.body, ...allowedFields);
     
-    // Handle file upload if present
-    if (req.file) {
-       filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.file.filename}`;
+    // Handle file uploads if present
+    if (req.files) {
+        // Handle user photo upload
+        if (req.files.photo && req.files.photo[0]) {
+            filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.files.photo[0].filename}`;
+        }
+        
+        // Handle business logo upload
+        if (req.files.businessLogo && req.files.businessLogo[0]) {
+            filteredBody.businessLogo = `${process.env.APP_URL}/uploads/businesses/logos/${req.files.businessLogo[0].filename}`;
+        }
     }
     
     // 3) Update user document 
@@ -197,6 +208,62 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         }
     });
 });
+
+// exports.updateMe = catchAsync(async (req, res, next) => {
+//     // 1) Create error if user POSTs password data
+//     if (req.body.password || req.body.passwordConfirm) {
+//         return next(new AppError('This route is not for password updates. Please use /updateMyPassword route!', '', 400));
+//     }
+
+//     // 2) Filter out unwanted fields and only allow specific updates
+//     const allowedFields = [
+//         'firstName', 
+//         'lastName', 
+//         'email', 
+//         'primaryPhone', 
+//         'state', 
+//         'primaryAddress', 
+//         'photo',
+//         'businessName',
+//         'businessCategoryId',
+//         'businessLogo'
+//     ];
+    
+//     const filteredBody = filterObj(req.body, ...allowedFields);
+    
+//     // Handle file upload if present
+//     if (req.file) {
+//        filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.file.filename}`;
+//        if(req.file) req.body.businessLogo = `${app_url}/uploads/businesses/logos/${req.file.filename}`;
+//     }
+    
+//     // 3) Update user document 
+//     const user = await User.findByPk(req.user.id);
+//     if (!user) {
+//         return next(new AppError('User not found', '', 404));
+//     }
+
+//     // Update the user with the filtered data
+//     await user.update(filteredBody, {
+//         fields: allowedFields, // Only update allowed fields
+//         validate: true // Run model validations
+//     });
+
+//     // Optionally: If you want to return the updated user without sensitive data
+//     const userData = user.get({ plain: true });
+//     delete userData.password;
+//     delete userData.passwordResetToken;
+//     delete userData.passwordResetExpires;
+//     delete userData.emailVerificationCode;
+//     delete userData.emailVerificationExpires;
+
+//     res.status(200).json({
+//         status: 'success',
+//         data: {
+//             user: userData
+//         }
+//     });
+// });
 
 exports.getMe = (req, res, next)=>{
     req.params.id = req.user.id;
