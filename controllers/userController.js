@@ -6,46 +6,54 @@ const Email = require('../utils/email');
 const generatePaginationMeta = require('../utils/pagination');
 
 
-exports.getAllUsers = catchAsync(async(req, res, next)=>{
+exports.getAllUsers = catchAsync(async (req, res, next) => {
     // Initialize APIFeatures with query params
     const features = new APIFeatures(req.query, 'User')
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
 
     // Include category model
-    features.queryOptions.include = 
-        {
-          model: Category,
-          as:'category',
-          attributes:['name']
-        };
-    
+    features.queryOptions.include =
+    {
+        model: Category,
+        as: 'category',
+        attributes: ['name']
+    };
+
     // Execute the query with count
     const { count, rows: users } = await User.findAndCountAll(features.getOptions());
     const { page, limit } = features.getPaginationInfo();
     const pagination = generatePaginationMeta({ count, page, limit, req });
-    
+
     //Send Response
     res.status(200).json({
-        status:"success",
-        result:users.length,
+        status: "success",
+        result: users.length,
         pagination,
-        data:{
+        data: {
             users
         }
     })
 });
 
-exports.getUser = catchAsync(async(req, res, next)=>{
-    
-    const user = await User.findByPk(req.params.id)
-    if(!user){
+exports.getUser = catchAsync(async (req, res, next) => {
+
+    const user = await User.findByPk(req.params.id, {
+        include: [
+            {
+                model: Category,
+                as: 'category',
+                attributes: ['name']
+            }
+        ]
+    })
+    if (!user) {
         return next(new AppError('No user was found with that ID', '', 404));
     }
     res.status(200).json({
-        status:"success",
+        status: "success",
         user
     });
 })
@@ -55,7 +63,7 @@ const updateApprovalStatus = async (user, newStatus) => {
     const validStatuses = ['approve', 'deny', 'deactivate', 'pending'];
     // Check if newStatus is valid
     if (!validStatuses.includes(newStatus)) {
-        throw new AppError("Invalid data", {status:`Status must be one of: ${validStatuses.join(', ')}`}, 400);
+        throw new AppError("Invalid data", { status: `Status must be one of: ${validStatuses.join(', ')}` }, 400);
     }
     // Prevent redundant status updates
     if (newStatus === 'approve' && user.status === 'active') {
@@ -75,15 +83,15 @@ const updateApprovalStatus = async (user, newStatus) => {
     if (newStatus === 'approve') {
         user.status = 'active';
         console.log('Currently approving');
-        
+
     } else if (newStatus === 'deny') {
         console.log('Currently denying');
-        
+
         user.status = 'denied';
     } else if (newStatus === 'deactivate') {
         console.log("Currently deactivating")
         user.status = 'deactivated';
-    }else if (newStatus === 'pending') {
+    } else if (newStatus === 'pending') {
         console.log("Currently pending")
         user.status = 'pending';
     }
@@ -94,38 +102,38 @@ const updateApprovalStatus = async (user, newStatus) => {
 };
 
 
-exports.updateStatus = catchAsync(async(req, res, next)=>{
+exports.updateStatus = catchAsync(async (req, res, next) => {
     //Getting status and checking if it there
-    let{status} = req.body
-    if(!status){
-        return next(new AppError("Invalid data", {status: 'Please provide status'}, 404))
+    let { status } = req.body
+    if (!status) {
+        return next(new AppError("Invalid data", { status: 'Please provide status' }, 404))
     }
-    
+
     let type;
     const user = await User.findByPk(req.params.id);
     User
 
-    if(!user){
+    if (!user) {
         return next(new AppError("No user found with that ID", '', 404))
     }
     let url = `${req.get('referer')}manage/investor/dashboard`
-   
-    if (status === 'approve')type='account_approved'
-    
-    if (status === 'deny') type='account_denied'
-     
-    if (status === 'deactivate') type="account_deactivated"
-    
-    if (status === 'pending') type="account_pending"
-       
+
+    if (status === 'approve') type = 'account_approved'
+
+    if (status === 'deny') type = 'account_denied'
+
+    if (status === 'deactivate') type = "account_deactivated"
+
+    if (status === 'pending') type = "account_pending"
+
     try {
         const updatedUser = await updateApprovalStatus(user, status)
         await new Email(user, '', url, type).sendStatus();
         res.status(200).json({
             status: 'success',
             message: `User's account mark as ${status} successfully!`,
-            data:{
-                user:updatedUser
+            data: {
+                user: updatedUser
             }
         });
     } catch (error) {
@@ -154,33 +162,33 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
     // 2) Filter out unwanted fields and only allow specific updates
     const allowedFields = [
-        'firstName', 
-        'lastName', 
-        'email', 
-        'primaryPhone', 
-        'state', 
-        'primaryAddress', 
+        'firstName',
+        'lastName',
+        'email',
+        'primaryPhone',
+        'state',
+        'primaryAddress',
         'photo',
         'businessName',
         'businessCategoryId',
         'businessLogo'
     ];
-    
+
     const filteredBody = filterObj(req.body, ...allowedFields);
-    
+
     // Handle file uploads if present
     if (req.files) {
         // Handle user photo upload
         if (req.files.photo && req.files.photo[0]) {
             filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.files.photo[0].filename}`;
         }
-        
+
         // Handle business logo upload
         if (req.files.businessLogo && req.files.businessLogo[0]) {
             filteredBody.businessLogo = `${process.env.APP_URL}/uploads/businesses/logos/${req.files.businessLogo[0].filename}`;
         }
     }
-    
+
     // 3) Update user document 
     const user = await User.findByPk(req.user.id);
     if (!user) {
@@ -228,15 +236,15 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 //         'businessCategoryId',
 //         'businessLogo'
 //     ];
-    
+
 //     const filteredBody = filterObj(req.body, ...allowedFields);
-    
+
 //     // Handle file upload if present
 //     if (req.file) {
 //        filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.file.filename}`;
 //        if(req.file) req.body.businessLogo = `${app_url}/uploads/businesses/logos/${req.file.filename}`;
 //     }
-    
+
 //     // 3) Update user document 
 //     const user = await User.findByPk(req.user.id);
 //     if (!user) {
@@ -265,21 +273,21 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 //     });
 // });
 
-exports.getMe = (req, res, next)=>{
+exports.getMe = (req, res, next) => {
     req.params.id = req.user.id;
     next();
 }
 
-exports.deleteMe = catchAsync(async(req, res, next)=>{
+exports.deleteMe = catchAsync(async (req, res, next) => {
     const user = await User.findByPk(req.user.id);
     if (!user) {
         return next(new AppError('User not found', '', 404));
     }
 
-    await user.update({active:false});
+    await user.update({ active: false });
 
     res.status(204).json({
-        status:'success',
-        data:null
+        status: 'success',
+        data: null
     })
 })
