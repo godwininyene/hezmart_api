@@ -23,7 +23,7 @@ block content
           tr
             td(style="text-align:left; padding: 8px; border-bottom: 1px solid #ddd;")= item.name
             td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= item.quantity
-            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.discountPrice).toLocaleString() || parseFloat(item.price).toLocaleString()}`
+            td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${(item.discountPrice && parseFloat(item.discountPrice) > 0 ? parseFloat(item.discountPrice) : parseFloat(item.price)).toLocaleString()}`
             td(style="text-align:right; padding: 8px; border-bottom: 1px solid #ddd;")= `₦${parseFloat(item.total).toLocaleString()}`
         tr
           td(colspan="3" style="text-align:right; padding: 8px; font-weight: bold;") Order Total:

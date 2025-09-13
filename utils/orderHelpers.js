@@ -252,8 +252,9 @@ exports.processOrderCreation = async (orderData, paymentDetails = {}) => {
 
   return order;
 };
-
 exports.sendOrderNotifications = async (order, orderData) => {
+  console.log('Order data received:', JSON.stringify(orderData, null, 2));
+  
   // Prepare and send vendor notifications
   const vendorOrdersMap = new Map();
   orderData.items.forEach(item => {
@@ -275,14 +276,17 @@ exports.sendOrderNotifications = async (order, orderData) => {
   // Send vendor notifications
   await Promise.all(vendors.map(async vendor => {
     const vendorItems = vendorOrdersMap.get(vendor.id).items;
-    const vendorOrderTotal = vendorItems.reduce((sum, item) => {
-      return sum + (item.discountPrice || item.price) * item.quantity;
-    }, 0);
-
+    
+    // Calculate totals for vendor items
     vendorItems.forEach(item => {
-      const unitPrice = item.discountPrice || item.price;
-      item.total = unitPrice * item.quantity;
+      const unitPrice = parseFloat(item.discountPrice) || parseFloat(item.price);
+      item.total = unitPrice * parseInt(item.quantity);
+      console.log(`Vendor item ${item.name}: price=${item.price}, discountPrice=${item.discountPrice}, unitPrice=${unitPrice}, quantity=${item.quantity}, total=${item.total}`);
     });
+
+    const vendorOrderTotal = vendorItems.reduce((sum, item) => {
+      return sum + item.total;
+    }, 0);
 
     try {
       await new Email(
@@ -310,16 +314,25 @@ exports.sendOrderNotifications = async (order, orderData) => {
     });
 
     if (customer) {
+      // Calculate customer items with proper parsing
       const customerItems = orderData.items.map(item => {
-        const unitPrice = item.discountPrice || item.price;
+        const unitPrice = parseFloat(item.discountPrice) || parseFloat(item.price);
+        const total = unitPrice * parseInt(item.quantity);
+        
+        console.log(`Customer item ${item.name}: price=${item.price}, discountPrice=${item.discountPrice}, unitPrice=${unitPrice}, quantity=${item.quantity}, total=${total}`);
+        
         return {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
           discountPrice: item.discountPrice,
-          total: unitPrice * item.quantity
+          total: total
         };
       });
+
+      // Calculate subtotal to verify
+      const calculatedSubtotal = customerItems.reduce((sum, item) => sum + item.total, 0);
+      console.log(`Order subtotal: ${order.subtotal}, Calculated subtotal: ${calculatedSubtotal}`);
       
       await new Email(
         customer,
@@ -340,12 +353,12 @@ exports.sendOrderNotifications = async (order, orderData) => {
           primaryPhone: orderData.deliveryAddress.primaryPhone,
           primaryAddress: orderData.deliveryAddress.primaryAddress,
           state: orderData.deliveryAddress.state,
-          email:orderData.deliveryAddress.email
+          email: orderData.deliveryAddress.email
         },
         items: customerItems,
         orderTotal: order.total,
-        subtotal:order.subtotal,
-        discount:orderData.discount,
+        subtotal: order.subtotal,
+        discount: orderData.discount,
         supportPhone: process.env.SUPPORT_PHONE || '+234 916 000 2490',
         deliveryOption: orderData.deliveryOption,
         stateFeeDetails: orderData.stateFeeDetails,
@@ -362,41 +375,202 @@ exports.sendOrderNotifications = async (order, orderData) => {
       firstName: 'Hezmart Admin',
       email: 'hezmartng@gmail.com'
     };
-    
-    const adminItems = orderData.items.map(item => {
-      const unitPrice = item.discountPrice || item.price;
-      const vendor = vendors.find(v => v.id === item.vendorId);
+
+    // Calculate totals for all items
+    const allItems = orderData.items.map(item => {
+      const unitPrice = parseFloat(item.discountPrice) || parseFloat(item.price);
+      const total = unitPrice * parseInt(item.quantity);
       return {
-        name: item.name,
-        vendor: vendor?.firstName || 'Unknown Vendor',
-        quantity: item.quantity,
-        price: item.price,
-        discountPrice: item.discountPrice,
-        total: unitPrice * item.quantity
+        ...item,
+        total: total
       };
     });
 
-    const adminEmailData = {
+    const grandTotal = allItems.reduce((sum, item) => sum + item.total, 0);
+
+    // Send notification to admin
+    await new Email(
+      admin,
+      null,
+      `${process.env.FRONTEND_URL}/admin/orders/${order.id}`,
+      'new_order_admin'
+    ).sendAdminOrderNotification({
+      subject: `📦 New Order Placed - Order #${order.orderNumber}`,
       orderNumber: order.orderNumber,
-      orderId: order.id,
       orderDate: new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
-      paymentMethod: order.paymentMethod,
       customerName: orderData.customer.name,
-      items: adminItems,
+      customerEmail: orderData.deliveryAddress.email,
+      customerPhone: orderData.deliveryAddress.primaryPhone,
+      paymentMethod: orderData.paymentMethod.charAt(0).toUpperCase() + orderData.paymentMethod.slice(1),
+      deliveryOption: orderData.deliveryOption === 'door' ? 'Door Delivery' : 'Pickup Station',
       orderTotal: order.total,
-    };
+      items: allItems,
+      vendorCount: new Set(orderData.items.map(item => item.vendorId)).size,
+      orderId: order.id,
+      shippingAddress: orderData.deliveryOption === 'door' ? {
+        address: orderData.deliveryAddress.primaryAddress,
+        state: orderData.deliveryAddress.state,
+        phone: orderData.deliveryAddress.primaryPhone
+      } : null,
+      pickupStation: orderData.deliveryOption === 'pickup' ? {
+        name: orderData.pickupStationDetails.name,
+        address: orderData.pickupStationDetails.address,
+        state: orderData.pickupStationDetails.state
+      } : null
+    });
 
-    await new Email(
-      admin,
-      null,
-      `${process.env.FRONTEND_URL}/manage/admin/orders/${order.id}`,
-      'new_order'
-    ).sendAdminOrderNotification(adminEmailData);
-  } catch (err) {
-    console.error(`Failed to send order notification to admin:`, err);
+  } catch (adminError) {
+    console.error('Failed to send admin notification:', adminError);
   }
 };
+// exports.sendOrderNotifications = async (order, orderData) => {
+//   // Prepare and send vendor notifications
+//   const vendorOrdersMap = new Map();
+//   orderData.items.forEach(item => {
+//     if (!vendorOrdersMap.has(item.vendorId)) {
+//       vendorOrdersMap.set(item.vendorId, {
+//         vendorId: item.vendorId,
+//         items: []
+//       });
+//     }
+//     vendorOrdersMap.get(item.vendorId).items.push(item);
+//   });
+
+//   const vendorIds = Array.from(vendorOrdersMap.keys());
+//   const vendors = await User.findAll({
+//     where: { id: vendorIds },
+//     attributes: ['id', 'email', 'firstName']
+//   });
+
+//   // Send vendor notifications
+//   await Promise.all(vendors.map(async vendor => {
+//     const vendorItems = vendorOrdersMap.get(vendor.id).items;
+//     const vendorOrderTotal = vendorItems.reduce((sum, item) => {
+//       return sum + (item.discountPrice || item.price) * item.quantity;
+//     }, 0);
+
+//     vendorItems.forEach(item => {
+//       const unitPrice = item.discountPrice || item.price;
+//       item.total = unitPrice * item.quantity;
+//     });
+
+//     try {
+//       await new Email(
+//         vendor,
+//         null,
+//         `${process.env.FRONTEND_URL}/manage/vendor/orders/${order.id}`,
+//         'new_order'
+//       ).sendVendorOrderNotification({
+//         subject: `🎉 New Order Received (${order.orderNumber})`,
+//         orderNumber: order.orderNumber,
+//         orderTotal: vendorOrderTotal,
+//         items: vendorItems,
+//         customerName: orderData.customer.name,
+//         orderId: order.id
+//       });
+//     } catch (emailError) {
+//       console.error(`Failed to send email to vendor ${vendor.email}:`, emailError);
+//     }
+//   }));
+
+//   // Send customer order confirmation
+//   try {
+//     const customer = await User.findByPk(orderData.userId, {
+//       attributes: ['id', 'email', 'firstName']
+//     });
+
+//     if (customer) {
+//       const customerItems = orderData.items.map(item => {
+//         const unitPrice = item.discountPrice || item.price;
+//         return {
+//           name: item.name,
+//           quantity: item.quantity,
+//           price: item.price,
+//           discountPrice: item.discountPrice,
+//           total: unitPrice * item.quantity
+//         };
+//       });
+      
+//       await new Email(
+//         customer,
+//         null,
+//         `${process.env.FRONTEND_URL}/orders/${order.id}`,
+//         'order_confirmation'
+//       ).sendCustomerOrderConfirmation({
+//         subject: `✅ Order Confirmation – Order #${order.orderNumber}`,
+//         orderNumber: order.orderNumber,
+//         orderDate: new Date().toLocaleDateString('en-US', {
+//           year: 'numeric',
+//           month: 'long',
+//           day: 'numeric'
+//         }),
+//         paymentMethod: orderData.paymentMethod.charAt(0).toUpperCase() + orderData.paymentMethod.slice(1),
+//         shippingAddress: {
+//           name: orderData.customer.name,
+//           primaryPhone: orderData.deliveryAddress.primaryPhone,
+//           primaryAddress: orderData.deliveryAddress.primaryAddress,
+//           state: orderData.deliveryAddress.state,
+//           email:orderData.deliveryAddress.email
+//         },
+//         items: customerItems,
+//         orderTotal: order.total,
+//         subtotal:order.subtotal,
+//         discount:orderData.discount,
+//         supportPhone: process.env.SUPPORT_PHONE || '+234 916 000 2490',
+//         deliveryOption: orderData.deliveryOption,
+//         stateFeeDetails: orderData.stateFeeDetails,
+//         pickupStationDetails: orderData.pickupStationDetails
+//       });
+//     }
+//   } catch (customerEmailError) {
+//     console.error('Failed to send order confirmation to customer:', customerEmailError);
+//   }
+
+//   // Send admin notification
+//   try {
+//     const admin = {
+//       firstName: 'Hezmart Admin',
+//       email: 'hezmartng@gmail.com'
+//     };
+    
+//     const adminItems = orderData.items.map(item => {
+//       const unitPrice = item.discountPrice || item.price;
+//       const vendor = vendors.find(v => v.id === item.vendorId);
+//       return {
+//         name: item.name,
+//         vendor: vendor?.firstName || 'Unknown Vendor',
+//         quantity: item.quantity,
+//         price: item.price,
+//         discountPrice: item.discountPrice,
+//         total: unitPrice * item.quantity
+//       };
+//     });
+
+//     const adminEmailData = {
+//       orderNumber: order.orderNumber,
+//       orderId: order.id,
+//       orderDate: new Date().toLocaleDateString('en-US', {
+//         year: 'numeric',
+//         month: 'long',
+//         day: 'numeric'
+//       }),
+//       paymentMethod: order.paymentMethod,
+//       customerName: orderData.customer.name,
+//       items: adminItems,
+//       orderTotal: order.total,
+//     };
+
+//     await new Email(
+//       admin,
+//       null,
+//       `${process.env.FRONTEND_URL}/manage/admin/orders/${order.id}`,
+//       'new_order'
+//     ).sendAdminOrderNotification(adminEmailData);
+//   } catch (err) {
+//     console.error(`Failed to send order notification to admin:`, err);
+//   }
+// };

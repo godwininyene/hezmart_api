@@ -31,14 +31,14 @@ exports.updateSettings = catchAsync(async (req, res, next) => {
     // Update existing settings
     settings = await currentSettings.update({
       ...req.body,
-      updatedBy: req.user.id,
+      // updatedBy: req.user.id,
       isActive: true
     });
   } else {
     // Create first settings if none exist
     settings = await ShippingSetting.create({
       ...req.body,
-      updatedBy: req.user.id,
+      // updatedBy: req.user.id,
       isActive: true
     });
   }

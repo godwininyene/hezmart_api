@@ -34,13 +34,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue: true
     },
-    updatedBy: {
-      type: DataTypes.INTEGER,
-      references: {
-        model: 'users',
-        key: 'id'
-      }
-    }
+    // updatedBy: {
+    //   type: DataTypes.INTEGER,
+    //   references: {
+    //     model: 'users',
+    //     key: 'id'
+    //   }
+    // }
   }, {
     sequelize,
     modelName: 'ShippingSetting',

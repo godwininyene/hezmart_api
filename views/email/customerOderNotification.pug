@@ -72,7 +72,7 @@ block content
             tr(style="border-bottom: 1px solid #e5e7eb;")
               td(style="padding: 12px; text-align: left; vertical-align: top;")= item.name
               td(style="padding: 12px; text-align: right; vertical-align: top;")= item.quantity
-              td(style="padding: 12px; text-align: right; vertical-align: top;")= `₦${(item.discountPrice ? parseFloat(item.discountPrice) : parseFloat(item.price)).toLocaleString()}`
+              td(style="padding: 12px; text-align: right; vertical-align: top;")= `₦${(item.discountPrice && parseFloat(item.discountPrice) > 0 ? parseFloat(item.discountPrice) : parseFloat(item.price)).toLocaleString()}`
               td(style="padding: 12px; text-align: right; vertical-align: top;")= `₦${parseFloat(item.total).toLocaleString()}`
         tfoot
           tr

@@ -1,4 +1,4 @@
-const { User, Category } = require('../models');
+const { User, Category, Order, sequelize } = require('../models');
 const APIFeatures = require("../utils/apiFeatures");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require('../utils/appError');
@@ -36,6 +36,77 @@ exports.getAllUsers = catchAsync(async (req, res, next) => {
             users
         }
     })
+});
+
+exports.getAllCustomersWithStats = catchAsync(async (req, res, next) => {
+    // Initialize APIFeatures with query params
+    const features = new APIFeatures(req.query, 'User')
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
+
+    // Add base where clause to only get customers
+    features.queryOptions.where = {
+        ...features.queryOptions.where,
+        role: 'customer'
+    };
+
+    // Include order statistics as a separate query
+    const { count, rows: customers } = await User.findAndCountAll(features.getOptions());
+
+    // Get order statistics for all customers
+    const customerIds = customers.map(customer => customer.id);
+    
+    if (customerIds.length > 0) {
+        const orderStats = await Order.findAll({
+            attributes: [
+                'userId',
+                [sequelize.fn('COUNT', sequelize.col('id')), 'totalOrders'],
+                [sequelize.fn('SUM', sequelize.col('total')), 'totalSpent']
+            ],
+            where: {
+                userId: customerIds
+            },
+            group: ['userId'],
+            raw: true
+        });
+
+        // Map order stats to customers
+        const statsMap = new Map();
+        orderStats.forEach(stat => {
+            statsMap.set(stat.userId, {
+                totalOrders: parseInt(stat.totalOrders) || 0,
+                totalSpent: parseFloat(stat.totalSpent) || 0
+            });
+        });
+
+        // Add stats to each customer
+        customers.forEach(customer => {
+            const stats = statsMap.get(customer.id) || { totalOrders: 0, totalSpent: 0 };
+            customer.dataValues.totalOrders = stats.totalOrders;
+            customer.dataValues.totalSpent = stats.totalSpent;
+        });
+    } else {
+        // If no customers, add default stats
+        customers.forEach(customer => {
+            customer.dataValues.totalOrders = 0;
+            customer.dataValues.totalSpent = 0;
+        });
+    }
+
+    const { page, limit } = features.getPaginationInfo();
+    const pagination = generatePaginationMeta({ count, page, limit, req });
+
+    // Send Response
+    res.status(200).json({
+        status: "success",
+        result: customers.length,
+        pagination,
+        data: {
+            customers
+        }
+    });
 });
 
 exports.getUser = catchAsync(async (req, res, next) => {
@@ -217,61 +288,6 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     });
 });
 
-// exports.updateMe = catchAsync(async (req, res, next) => {
-//     // 1) Create error if user POSTs password data
-//     if (req.body.password || req.body.passwordConfirm) {
-//         return next(new AppError('This route is not for password updates. Please use /updateMyPassword route!', '', 400));
-//     }
-
-//     // 2) Filter out unwanted fields and only allow specific updates
-//     const allowedFields = [
-//         'firstName', 
-//         'lastName', 
-//         'email', 
-//         'primaryPhone', 
-//         'state', 
-//         'primaryAddress', 
-//         'photo',
-//         'businessName',
-//         'businessCategoryId',
-//         'businessLogo'
-//     ];
-
-//     const filteredBody = filterObj(req.body, ...allowedFields);
-
-//     // Handle file upload if present
-//     if (req.file) {
-//        filteredBody.photo = `${process.env.APP_URL}/uploads/users/${req.file.filename}`;
-//        if(req.file) req.body.businessLogo = `${app_url}/uploads/businesses/logos/${req.file.filename}`;
-//     }
-
-//     // 3) Update user document 
-//     const user = await User.findByPk(req.user.id);
-//     if (!user) {
-//         return next(new AppError('User not found', '', 404));
-//     }
-
-//     // Update the user with the filtered data
-//     await user.update(filteredBody, {
-//         fields: allowedFields, // Only update allowed fields
-//         validate: true // Run model validations
-//     });
-
-//     // Optionally: If you want to return the updated user without sensitive data
-//     const userData = user.get({ plain: true });
-//     delete userData.password;
-//     delete userData.passwordResetToken;
-//     delete userData.passwordResetExpires;
-//     delete userData.emailVerificationCode;
-//     delete userData.emailVerificationExpires;
-
-//     res.status(200).json({
-//         status: 'success',
-//         data: {
-//             user: userData
-//         }
-//     });
-// });
 
 exports.getMe = (req, res, next) => {
     req.params.id = req.user.id;

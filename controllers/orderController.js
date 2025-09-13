@@ -13,14 +13,10 @@ const { prepareOrderData, processOrderCreation ,sendOrderNotifications } = requi
 // Get all orders for current user
 exports.getUserOrders = catchAsync(async (req, res, next) => {
   const { role, id: userId } = req.user;
-  const features = new APIFeatures(req.query, 'Order')
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
-
-  // Base include structure with enhanced OrderItem fields
-  features.queryOptions.include = [
+  
+  // Build base where clause and include options
+  let whereClause = {};
+  let includeOptions = [
     {
       model: OrderItem,
       as: 'items',
@@ -46,18 +42,21 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
 
   // Role-based filtering
   if (role === 'admin') {
-    // Admin sees all orders with all items
-    features.queryOptions.where = features.queryOptions.where || {};
+    // Admin sees all orders - no additional where clause needed
   } else if (role === 'vendor') {
-    // Vendor sees only their items with parent order info
-    features.queryOptions.include[0].where = { vendorId: userId };
-    features.queryOptions.include[0].required = true; // Inner join to filter orders
-    
-    // For vendor view, we want to see the order even if some items are from other vendors
-    features.queryOptions.distinct = true;
+    // Vendor sees orders that contain their items using subquery
+    whereClause = {
+      id: {
+        [Sequelize.Op.in]: Sequelize.literal(`(
+          SELECT DISTINCT orderId 
+          FROM OrderItems 
+          WHERE vendorId = ${userId}
+        )`)
+      }
+    };
   } else {
     // Customer sees only their own orders
-    features.queryOptions.where = { userId };
+    whereClause = { userId };
   }
 
   // Add status-based filtering if requested
@@ -72,20 +71,43 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
     };
     
     const statuses = statusMap[req.query.status] || [req.query.status];
-    features.queryOptions.where = {
-      ...features.queryOptions.where,
+    whereClause = {
+      ...whereClause,
       status: { [Sequelize.Op.in]: statuses }
     };
   }
 
-  // Execute the query with count
-  const { count, rows: orders } = await Order.findAndCountAll(features.getOptions());
+  // Handle other query features (filter, sort, limit fields, paginate)
+  const features = new APIFeatures(req.query, 'Order')
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
 
-  // For vendor view, group items by vendor (though they'll only see their own)
+  // Merge the features with our custom where and include
+  const finalOptions = {
+    ...features.getOptions(),
+    where: { ...whereClause, ...features.getOptions().where },
+    include: includeOptions,
+    distinct: true // Important for correct counting with includes
+  };
+
+  // Execute the query
+  const { count, rows: orders } = await Order.findAndCountAll(finalOptions);
+
+  // For vendor view, filter items to show only vendor's items and group them
   if (role === 'vendor') {
     orders.forEach(order => {
+      // Filter items to show only this vendor's items
+      const vendorItems = order.items.filter(item => item.vendorId === userId);
+      
+      // Replace the items array with filtered items
+      order.dataValues.items = vendorItems;
+      
+      // Create vendorItems grouping structure (though it will only contain this vendor)
       order.dataValues.vendorItems = {};
-      order.items.forEach(item => {
+      
+      vendorItems.forEach(item => {
         if (!order.dataValues.vendorItems[item.vendorId]) {
           order.dataValues.vendorItems[item.vendorId] = {
             vendor: item.vendor,
@@ -113,6 +135,108 @@ exports.getUserOrders = catchAsync(async (req, res, next) => {
     }
   });
 });
+// exports.getUserOrders = catchAsync(async (req, res, next) => {
+//   const { role, id: userId } = req.user;
+//   const features = new APIFeatures(req.query, 'Order')
+//     .filter()
+//     .sort()
+//     .limitFields()
+//     .paginate();
+
+//   // Base include structure with enhanced OrderItem fields
+//   features.queryOptions.include = [
+//     {
+//       model: OrderItem,
+//       as: 'items',
+//       include: [
+//         {
+//           model: Product,
+//           as: 'product',
+//           attributes: ['id', 'name', 'coverImage']
+//         },
+//         {
+//           model: User,
+//           as: 'vendor',
+//           attributes: ['id', 'businessName', 'businessLogo']
+//         }
+//       ]
+//     },
+//     {
+//       model: User,
+//       as: 'user',
+//       attributes: ['id', 'firstName', 'lastName', 'photo']
+//     }
+//   ];
+
+//   // Role-based filtering
+//   if (role === 'admin') {
+//     // Admin sees all orders with all items
+//     features.queryOptions.where = features.queryOptions.where || {};
+//   } else if (role === 'vendor') {
+//     // Vendor sees only their items with parent order info
+//     features.queryOptions.include[0].where = { vendorId: userId };
+//     features.queryOptions.include[0].required = true; // Inner join to filter orders
+    
+//     // For vendor view, we want to see the order even if some items are from other vendors
+//     features.queryOptions.distinct = true;
+//   } else {
+//     // Customer sees only their own orders
+//     features.queryOptions.where = { userId };
+//   }
+
+//   // Add status-based filtering if requested
+//   if (req.query.status) {
+//     const statusMap = {
+//       'pending': ['pending'],
+//       'processing': ['processing'],
+//       'shipped': ['partially_shipped', 'shipped'],
+//       'delivered': ['partially_delivered', 'delivered'],
+//       'received': ['partially_received', 'completed'],
+//       'cancelled': ['partially_cancelled', 'cancelled']
+//     };
+    
+//     const statuses = statusMap[req.query.status] || [req.query.status];
+//     features.queryOptions.where = {
+//       ...features.queryOptions.where,
+//       status: { [Sequelize.Op.in]: statuses }
+//     };
+//   }
+
+//   // Execute the query with count
+//   const { count, rows: orders } = await Order.findAndCountAll(features.getOptions());
+
+//   // For vendor view, group items by vendor (though they'll only see their own)
+//   if (role === 'vendor') {
+//     orders.forEach(order => {
+//       order.dataValues.vendorItems = {};
+//       order.items.forEach(item => {
+//         if (!order.dataValues.vendorItems[item.vendorId]) {
+//           order.dataValues.vendorItems[item.vendorId] = {
+//             vendor: item.vendor,
+//             items: []
+//           };
+//         }
+//         order.dataValues.vendorItems[item.vendorId].items.push(item);
+//       });
+//     });
+//   }
+
+//   const { page, limit } = features.getPaginationInfo();
+//   const pagination = generatePaginationMeta({ count, page, limit, req });
+
+//   res.status(200).json({
+//     status: 'success',
+//     pagination,
+//     data: {
+//       orders,
+//       // Include role-specific metadata
+//       meta: role === 'vendor' ? { 
+//         isVendorView: true,
+//         totalItems: count 
+//       } : null
+//     }
+//   });
+// });
 
 
 // Get single order details

@@ -18,9 +18,8 @@ router.post('/auth/google', authController.googleAuth);
 router.route('/verify_email').post(authController.verifyEmail);
 router.route('/resend_verification').post(authController.resendVerificationEmail);
 
-//Non protected routes;sss
+// Non protected routes
 router.get('/', userController.getAllUsers);
-
 
 // Protected routes (require authentication)
 router.use(authController.protect);
@@ -30,10 +29,14 @@ router.get('/me', userController.getMe, userController.getUser);
 router.patch('/updateMe', uploadUserFiles, userController.updateMe);
 // router.patch('/updateMe', uploadUserPhoto, uploadBusinessLogo, userController.updateMe);
 router.delete('/deleteMe', userController.deleteMe);
-router.get('/:id', userController.getUser);
 
 // Admin restricted routes
-router.patch('/:id/status', authController.restrictTo('admin'), userController.updateStatus);
+router.use(authController.restrictTo('admin'));
+router.get('/customers', userController.getAllCustomersWithStats);
+
+// Parameterized routes should come after specific routes
+router.get('/:id', userController.getUser);
+router.patch('/:id/status', userController.updateStatus);
 
 // Add likes nested route for users
 router.use('/likes', likeRouter);

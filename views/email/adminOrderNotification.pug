@@ -46,7 +46,7 @@ block content
               td(style="padding: 12px; text-align: left;")= item.name
               td(style="padding: 12px; text-align: right;")= item.vendor || 'Hezmart'
               td(style="padding: 12px; text-align: right;")= item.quantity
-              td(style="padding: 12px; text-align: right;")= `₦${parseFloat(item.discountPrice || item.price).toLocaleString()}`
+              td(style="padding: 12px; text-align: right;")= `₦${(item.discountPrice && parseFloat(item.discountPrice) > 0 ? parseFloat(item.discountPrice) : parseFloat(item.price)).toLocaleString()}`
               td(style="padding: 12px; text-align: right;")= `₦${parseFloat(item.total).toLocaleString()}`
 
     div.action-buttons(style="margin: 30px 0; text-align: center;")

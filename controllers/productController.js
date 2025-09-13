@@ -1,7 +1,7 @@
 const ProductService = require('../services/productService');
 const { parseField, handleFileUploads } = require('../utils/productHelpers');
 const APIFeatures = require("../utils/apiFeatures");
-const { Product,  User, Category, Review } = require("../models");
+const { Product, User, Category, Review } = require("../models");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { getProductIncludes } = require('../utils/productHelpers');
@@ -17,7 +17,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
   });
 
   //Create with association
-  req.body.userId =req.user.id
+  req.body.userId = req.user.id
   const product = await ProductService.createWithAssociations(req.body);
   //Send Response
   res.status(201).json({
@@ -26,53 +26,53 @@ exports.createProduct = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.getAllProducts = catchAsync(async(req, res, next) => {
+exports.getAllProducts = catchAsync(async (req, res, next) => {
   const features = new APIFeatures(req.query, 'Product')
     .filter()
     .sort()
     .limitFields()
     .paginate();
 
-    // Include category model
-   features.queryOptions.include = 
-   [
-    {
-      model: Category,
-      as:'category',
-      attributes:['name', 'id']
-    },
-    {
-      model: User,
-      as:'user',
-      attributes:['businessName', 'id']
-    }
-   ];
+  // Include category model
+  features.queryOptions.include =
+    [
+      {
+        model: Category,
+        as: 'category',
+        attributes: ['name', 'id']
+      },
+      {
+        model: User,
+        as: 'user',
+        attributes: ['businessName', 'id']
+      }
+    ];
 
-    // Restrict products for vendors to only their own
-    if (req.user?.role === 'vendor') {
-      features.queryOptions.where = {
-        ...features.queryOptions.where,
-        userId: req.user.id  // Ensure only vendor's products are returned
-      };
-    }
+  // Restrict products for vendors to only their own
+  if (req.user?.role === 'vendor') {
+    features.queryOptions.where = {
+      ...features.queryOptions.where,
+      userId: req.user.id  // Ensure only vendor's products are returned
+    };
+  }
 
-    // Execute the query with count
-    const { count, rows: products } = await Product.findAndCountAll(features.getOptions());
-    const { page, limit } = features.getPaginationInfo();
-    const pagination = generatePaginationMeta({ count, page, limit, req });
+  // Execute the query with count
+  const { count, rows: products } = await Product.findAndCountAll(features.getOptions());
+  const { page, limit } = features.getPaginationInfo();
+  const pagination = generatePaginationMeta({ count, page, limit, req });
 
-  
+
   res.status(200).json({
     status: "success",
     result: products.length,
     pagination,
-    data:{
+    data: {
       products
     }
   });
 });
 
-exports.getProduct = catchAsync(async(req, res, next) => {
+exports.getProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findByPk(req.params.id, {
     include: getProductIncludes(),
     order: [[{ model: Review, as: 'reviews' }, 'createdAt', 'DESC']]
@@ -81,7 +81,7 @@ exports.getProduct = catchAsync(async(req, res, next) => {
   if (!product) {
     return next(new AppError('No product found with that ID', '', 404));
   }
-  
+
   res.status(200).json({
     status: "success",
     data: { product }
@@ -92,7 +92,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   // 1. Handle file uploads
   const product = await Product.findByPk(req.params.id);
   if (!product) {
-    return next(new AppError('No product found with that ID','', 404));
+    return next(new AppError('No product found with that ID', '', 404));
   }
 
   handleFileUploads(req, product.images || []);
@@ -105,7 +105,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   try {
     // 3. Delegate to service layer
     const updatedProduct = await ProductService.updateWithAssociations(
-      req.params.id, 
+      req.params.id,
       req.body
     );
 
@@ -130,7 +130,7 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
     });
   } catch (error) {
     console.log(error);
-    
+
     if (error.message === 'Product not found') {
       return next(new AppError('No product found with that ID', '', 404));
     }
@@ -138,16 +138,16 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
   }
 });
 
-exports.updateStatus = catchAsync(async(req, res, next)=>{
-  let{status} = req.body// approve, reject or suspend
+exports.updateStatus = catchAsync(async (req, res, next) => {
+  let { status } = req.body// approve, reject or suspend
 
   // Retrieve product, and user
   let product = await Product.findByPk(req.params.id, {
-    include:[
+    include: [
       {
-        model:User,
-        as:'user',
-        attributes:['firstName', 'lastName', 'email']
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'lastName', 'email']
       }
     ]
   });
@@ -157,7 +157,7 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
   }
 
   // Status checks
-  switch(status) {
+  switch (status) {
     case 'approve':
       if (product.status === 'active') {
         return next(new AppError("Product already approved!", '', 400));
@@ -179,25 +179,26 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
     default:
       return next(new AppError("Invalid action provided", '', 400));
   }
-  
+
 
 
 
 
   // Prepare email info
-  const referer = req.get('referer') || `${req.protocol}://${req.get('host')}`;
-  const url = `${referer}/manage/vendor/dashboard`;
-  
-     
+  // const referer = req.get('referer') || `${req.protocol}://${req.get('host')}`;
+  const url = `${process.env.FRONTEND_URL}/manage/vendor/dashboard`
+
+
+
   const types = {
     approve: 'approved_product',
-    suspend:'suspended_product',
-    reject:'declined_product'
+    suspend: 'suspended_product',
+    reject: 'declined_product'
   };
-  
+
   // Set email info based on action and transaction type
   const type = types[status];
-  
+
   //save updates
   await product.save({ validateBeforeSave: false });
 
@@ -206,9 +207,9 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
     reject: 'rejected',
     suspend: 'suspended'
   };
-  
+
   const pastAction = actionMessages[status];
-  
+
 
   try {
     // Send email to vendor
@@ -219,7 +220,7 @@ exports.updateStatus = catchAsync(async(req, res, next)=>{
       data: { product }
     });
   } catch (error) {
-   
+
     console.log('Product processing error:', error);
     return next(new AppError(
       `Product ${pastAction} successfully but there was a problem sending email notification.`,
